@@ -1,36 +1,57 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Lavanderia
 
-## Getting Started
+A booking app for shared laundry machines (washers and dryers) in an apartment building or dorm. It works like SuperSaaS or Skedda, but is self-hosted and only does what a shared laundry room needs. The interface is in Italian.
 
-First, run the development server:
+## Features
+
+- **Residents** sign up and log in, pick a day, and book a free slot on any machine from a grid of time slots × machines. They can cancel their own upcoming bookings from the grid or from *Le mie prenotazioni*.
+- **Booking rules** are enforced on the server:
+  - no double bookings (an overlap check, backed by a unique index)
+  - a maximum number of active bookings per person
+  - a limit on how many days ahead people can book
+  - no bookings in the past
+  - only slots that match the current schedule
+- **Admins** (*Gestione* page) can:
+  - set the slot length, opening hours, booking limits and an optional registration code
+  - add, rename, reorder, disable or delete machines
+  - see and cancel upcoming bookings
+  - promote other users to admin
+  
+  On the booking grid, admins also see who booked each slot. Residents only see "Occupato".
+- All slot times use the `Europe/Rome` time zone (`src/lib/time.ts`), wherever the server runs. This includes the daylight-saving switch days.
+
+## Stack
+
+Next.js 15 (App Router, server actions) · TypeScript · Tailwind CSS 4 · Prisma 6 + SQLite · signed-cookie sessions (`jose`) · `bcryptjs` password hashing.
+
+## Getting started
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env        # then set SESSION_SECRET and ADMIN_PASSWORD
+npm run setup               # creates the database and the first admin
+npm run dev                 # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Log in with `ADMIN_EMAIL` / `ADMIN_PASSWORD` from `.env`. In this checkout, a random admin password has already been generated in `.env`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Project layout
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+prisma/schema.prisma        data model: User, Machine, Booking, Settings
+prisma/seed.ts              default settings, first admin, three sample machines
+src/lib/booking.ts          booking rules (createBooking)
+src/lib/time.ts             time zone and slot helpers
+src/lib/session.ts          login sessions, requireUser / requireAdmin
+src/app/actions.ts          login, register, logout, book, cancel
+src/app/prenota/            booking grid
+src/app/mie-prenotazioni/   the user's own bookings
+src/app/admin/              admin page and its actions
+```
 
-## Learn More
+## Before putting it online
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Use PostgreSQL instead of SQLite on a hosted server: change the `provider` in `schema.prisma` and set `DATABASE_URL`. SQLite is fine for a single small server.
+- Use a long random `SESSION_SECRET` and serve the app over HTTPS.
+- Set a registration code in *Gestione* so only residents can sign up.
+- Ideas for later: email reminders, password reset, recurring bookings, closed days, and a "machine broken" report button.
