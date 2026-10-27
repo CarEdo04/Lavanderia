@@ -56,7 +56,8 @@ model Settings {
   closeHour         Int     @default(24)
   closedWeekdays    String  @default("0") // digits, 0 = Sunday … 6 = Saturday
   maxActiveBookings Int     @default(3)
-  maxDaysAhead      Int     @default(7)
+  maxDaysAhead      Int     @default(21)
+  minHoursBefore    Int     @default(72) // bookings close this many hours before a shift starts
   registrationCode  String?
   rulesText         String? // null = default rules in src/lib/rules.ts
 }

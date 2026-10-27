@@ -86,6 +86,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             <input name="maxDaysAhead" type="number" min={1} max={60} defaultValue={settings.maxDaysAhead} className={`${field} mt-1 block w-full`} />
           </label>
           <label className="text-sm text-slate-700">
+            Ore minime di anticipo
+            <input name="minHoursBefore" type="number" min={0} max={720} defaultValue={settings.minHoursBefore} className={`${field} mt-1 block w-full`} />
+          </label>
+          <label className="text-sm text-slate-700">
             Codice di registrazione
             <input name="registrationCode" defaultValue={settings.registrationCode ?? ""} placeholder="vuoto = registrazione libera" className={`${field} mt-1 block w-full`} />
           </label>

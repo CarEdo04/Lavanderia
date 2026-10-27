@@ -20,6 +20,7 @@ export async function saveSettings(formData: FormData) {
   const closeHour = int(formData, "closeHour", 1, 24);
   const maxActiveBookings = int(formData, "maxActiveBookings", 1, 50);
   const maxDaysAhead = int(formData, "maxDaysAhead", 1, 60);
+  const minHoursBefore = int(formData, "minHoursBefore", 0, 720);
   const registrationCode = String(formData.get("registrationCode") ?? "").trim();
   const openDays = formData.getAll("openDays").map(String);
   const closedWeekdays = ["0", "1", "2", "3", "4", "5", "6"].filter((d) => !openDays.includes(d)).join("");
@@ -30,6 +31,8 @@ export async function saveSettings(formData: FormData) {
     closeHour === null ||
     maxActiveBookings === null ||
     maxDaysAhead === null ||
+    minHoursBefore === null ||
+    minHoursBefore >= maxDaysAhead * 24 || // nothing would ever be bookable
     (closeHour - openHour) * 60 < slotMinutes ||
     closedWeekdays.length === 7
   ) {
@@ -43,6 +46,7 @@ export async function saveSettings(formData: FormData) {
     closedWeekdays,
     maxActiveBookings,
     maxDaysAhead,
+    minHoursBefore,
     registrationCode: registrationCode || null,
   };
   await prisma.settings.upsert({ where: { id: 1 }, update: data, create: { id: 1, ...data } });

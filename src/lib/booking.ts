@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "./db";
-import { addDays, dayOf, slotsForDay, today } from "./time";
+import { addDays, dayOf, slotsForDay, today, type Slot } from "./time";
 
 export async function getSettings() {
   return (
@@ -9,11 +9,17 @@ export async function getSettings() {
   );
 }
 
+// A shift can be booked until `minHoursBefore` hours before it starts.
+export function isTooLate(slot: Slot, settings: { minHoursBefore: number }, now = new Date()): boolean {
+  return slot.start.getTime() - now.getTime() < settings.minHoursBefore * 3_600_000;
+}
+
 export type BookingResult =
   | "prenotata"
   | "occupato"
   | "limite"
   | "passato"
+  | "troppo-tardi"
   | "troppo-avanti"
   | "turno-non-valido"
   | "macchina";
@@ -32,6 +38,7 @@ export async function createBooking(userId: number, machineId: number, start: Da
 
   const now = new Date();
   if (slot.end <= now) return "passato";
+  if (isTooLate(slot, settings, now)) return "troppo-tardi";
   if (day > addDays(today(), settings.maxDaysAhead - 1)) return "troppo-avanti";
 
   try {

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { book, cancel } from "../actions";
 import { Flash } from "@/components/Flash";
 import { SubmitButton } from "@/components/SubmitButton";
-import { getSettings } from "@/lib/booking";
+import { getSettings, isTooLate } from "@/lib/booking";
 import { prisma } from "@/lib/db";
 import { fullName } from "@/lib/people";
 import { requireVerifiedUser } from "@/lib/session";
@@ -21,6 +21,11 @@ import {
 export const metadata = { title: "Prenota · Lavanderia" };
 
 const shortDate = (day: string) => formatDay(day, { day: "2-digit", month: "2-digit" });
+
+function formatWindow(days: number) {
+  if (days % 7 !== 0) return days === 1 ? "1 giorno" : `${days} giorni`;
+  return days === 7 ? "1 settimana" : `${days / 7} settimane`;
+}
 
 export default async function BookPage({
   searchParams,
@@ -45,7 +50,7 @@ export default async function BookPage({
   const weeks: string[] = [];
   for (let w = mondayOf(first); w <= mondayOf(lastDay); w = addDays(w, 7)) weeks.push(w);
   const hasBookable = (monday: string) =>
-    openDays(monday).some(({ day, slots }) => day <= lastDay && slots.some((s) => s.end > now));
+    openDays(monday).some(({ day, slots }) => day <= lastDay && slots.some((s) => !isTooLate(s, settings, now)));
   const week = settimana && weeks.includes(settimana) ? settimana : (weeks.find(hasBookable) ?? weeks[0]);
   const prevWeek = weeks[weeks.indexOf(week) - 1];
   const nextWeek = weeks[weeks.indexOf(week) + 1];
@@ -126,6 +131,16 @@ export default async function BookPage({
         </div>
       );
     }
+    if (isTooLate(slot, settings, now)) {
+      return (
+        <div
+          className="flex min-h-11 items-center px-2 text-xs text-slate-400"
+          title={`Le prenotazioni chiudono ${settings.minHoursBefore} ore prima del turno`}
+        >
+          Chiuso
+        </div>
+      );
+    }
     return (
       <form action={book}>
         <input type="hidden" name="machineId" value={machine!.id} />
@@ -149,8 +164,12 @@ export default async function BookPage({
   return (
     <div>
       <h1 className="text-2xl font-semibold text-slate-900">Prenota un turno</h1>
-      <p className="mb-4 text-sm text-slate-600">
+      <p className="text-sm text-slate-600">
         Turni da {formatDuration(settings.slotMinutes)} · prenotazioni attive {activeCount}/{settings.maxActiveBookings}
+      </p>
+      <p className="mb-4 text-sm text-slate-600">
+        Si prenota almeno {settings.minHoursBefore} ore prima del turno e fino a {formatWindow(settings.maxDaysAhead)}{" "}
+        in anticipo.
       </p>
 
       <Flash code={esito} />
