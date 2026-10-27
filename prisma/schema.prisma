@@ -46,9 +46,10 @@ model Booking {
 // Single row (id = 1) holding the booking rules.
 model Settings {
   id                Int     @id @default(1)
-  slotMinutes       Int     @default(60)
-  openHour          Int     @default(7)
-  closeHour         Int     @default(23)
+  slotMinutes       Int     @default(240)
+  openHour          Int     @default(8)
+  closeHour         Int     @default(24)
+  closedWeekdays    String  @default("0") // digits, 0 = Sunday … 6 = Saturday
   maxActiveBookings Int     @default(3)
   maxDaysAhead      Int     @default(7)
   registrationCode  String?

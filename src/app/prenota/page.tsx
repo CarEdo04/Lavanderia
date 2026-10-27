@@ -6,7 +6,7 @@ import { getSettings } from "@/lib/booking";
 import { prisma } from "@/lib/db";
 import { MACHINE_TYPES } from "@/lib/messages";
 import { requireUser } from "@/lib/session";
-import { addDays, formatDay, formatTime, slotsForDay, today } from "@/lib/time";
+import { addDays, formatDay, formatDuration, formatTime, slotsForDay, today } from "@/lib/time";
 
 export const metadata = { title: "Prenota · Lavanderia" };
 
@@ -21,11 +21,12 @@ export default async function BookPage({
   const isAdmin = user.role === "ADMIN";
 
   const first = today();
-  const days = Array.from({ length: Math.max(1, settings.maxDaysAhead) }, (_, i) => addDays(first, i));
   const now = new Date();
-  // Open on tomorrow once today's last slot is over.
-  const todayOver = (slotsForDay(first, settings).at(-1)?.end ?? now) <= now && days.length > 1;
-  const day = giorno && days.includes(giorno) ? giorno : todayOver ? days[1] : first;
+  // Bookable days: within the booking window, open, and not already over.
+  const days = Array.from({ length: Math.max(1, settings.maxDaysAhead) }, (_, i) => addDays(first, i)).filter(
+    (d) => (slotsForDay(d, settings).at(-1)?.end ?? now) > now,
+  );
+  const day = giorno && days.includes(giorno) ? giorno : (days[0] ?? first);
   const slots = slotsForDay(day, settings);
 
   const [machines, bookings, activeCount] = await Promise.all([
@@ -46,7 +47,7 @@ export default async function BookPage({
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">Prenota un turno</h1>
           <p className="text-sm text-slate-600">
-            Turni da {settings.slotMinutes} minuti · prenotazioni attive {activeCount}/{settings.maxActiveBookings}
+            Turni da {formatDuration(settings.slotMinutes)} · prenotazioni attive {activeCount}/{settings.maxActiveBookings}
           </p>
         </div>
       </div>
@@ -78,14 +79,14 @@ export default async function BookPage({
           Nessuna macchina disponibile al momento.
         </p>
       ) : slots.length === 0 ? (
-        <p className="rounded-lg border border-slate-200 bg-white p-6 text-slate-600">Nessun turno in questo giorno.</p>
+        <p className="rounded-lg border border-slate-200 bg-white p-6 text-slate-600">Nessun turno prenotabile nei prossimi giorni.</p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
           <table className="w-full border-collapse text-sm">
             <caption className="sr-only">Turni del {formatDay(day, { weekday: "long", day: "numeric", month: "long" })}</caption>
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50">
-                <th scope="col" className="sticky left-0 z-10 w-20 bg-slate-50 px-3 py-2 text-left font-medium text-slate-500">
+                <th scope="col" className="sticky left-0 z-10 w-28 bg-slate-50 px-3 py-2 text-left font-medium text-slate-500">
                   Orario
                 </th>
                 {machines.map((m) => (
@@ -102,7 +103,7 @@ export default async function BookPage({
                 return (
                   <tr key={slot.start.toISOString()} className="border-b border-slate-100 last:border-0">
                     <th scope="row" className="sticky left-0 z-10 whitespace-nowrap bg-white px-3 py-1.5 text-left font-normal tabular-nums text-slate-600">
-                      {formatTime(slot.start)}
+                      {formatTime(slot.start)}–{formatTime(slot.end)}
                     </th>
                     {machines.map((m) => {
                       const b = bookings.find(

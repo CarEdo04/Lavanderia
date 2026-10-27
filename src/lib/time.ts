@@ -58,12 +58,27 @@ export function formatTime(date: Date): string {
   return new Intl.DateTimeFormat("it-IT", { timeZone: TZ, hour: "2-digit", minute: "2-digit" }).format(date);
 }
 
+// 0 = Sunday … 6 = Saturday, like Date#getDay.
+export function weekday(day: string): number {
+  const [y, m, d] = day.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+}
+
+export const WEEKDAYS = ["Domenica", "Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato"];
+
+export function formatDuration(minutes: number): string {
+  if (minutes % 60 !== 0) return `${minutes} minuti`;
+  return minutes === 60 ? "1 ora" : `${minutes / 60} ore`;
+}
+
 export type Slot = { start: Date; end: Date };
 
+// Returns no slots on closed weekdays.
 export function slotsForDay(
   day: string,
-  rules: { slotMinutes: number; openHour: number; closeHour: number },
+  rules: { slotMinutes: number; openHour: number; closeHour: number; closedWeekdays?: string },
 ): Slot[] {
+  if (rules.closedWeekdays?.includes(String(weekday(day)))) return [];
   const slots: Slot[] = [];
   for (let m = rules.openHour * 60; m + rules.slotMinutes <= rules.closeHour * 60; m += rules.slotMinutes) {
     slots.push({ start: localToUtc(day, m), end: localToUtc(day, m + rules.slotMinutes) });

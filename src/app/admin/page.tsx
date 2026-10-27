@@ -6,7 +6,7 @@ import { getSettings } from "@/lib/booking";
 import { prisma } from "@/lib/db";
 import { MACHINE_TYPES } from "@/lib/messages";
 import { requireAdmin } from "@/lib/session";
-import { dayOf, formatDay, formatTime } from "@/lib/time";
+import { WEEKDAYS, dayOf, formatDay, formatDuration, formatTime } from "@/lib/time";
 
 export const metadata = { title: "Gestione · Lavanderia" };
 
@@ -60,9 +60,9 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           <label className="text-sm text-slate-700">
             Durata turno
             <select name="slotMinutes" defaultValue={settings.slotMinutes} className={`${field} mt-1 block w-full`}>
-              {[30, 45, 60, 90, 120, 150, 180].map((m) => (
+              {[30, 45, 60, 90, 120, 150, 180, 240].map((m) => (
                 <option key={m} value={m}>
-                  {m} minuti
+                  {formatDuration(m)}
                 </option>
               ))}
             </select>
@@ -87,6 +87,23 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             Codice di registrazione
             <input name="registrationCode" defaultValue={settings.registrationCode ?? ""} placeholder="vuoto = registrazione libera" className={`${field} mt-1 block w-full`} />
           </label>
+          <fieldset className="text-sm text-slate-700 sm:col-span-3">
+            <legend>Giorni di apertura</legend>
+            <div className="mt-1 flex flex-wrap gap-x-4 gap-y-2">
+              {[1, 2, 3, 4, 5, 6, 0].map((d) => (
+                <label key={d} className="flex items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    name="openDays"
+                    value={d}
+                    defaultChecked={!settings.closedWeekdays.includes(String(d))}
+                    className="h-4 w-4 accent-sky-600"
+                  />
+                  {WEEKDAYS[d]}
+                </label>
+              ))}
+            </div>
+          </fieldset>
           <div className="sm:col-span-3">
             <SubmitButton className={primary}>Salva regole</SubmitButton>
           </div>

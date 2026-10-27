@@ -20,6 +20,8 @@ export async function saveSettings(formData: FormData) {
   const maxActiveBookings = int(formData, "maxActiveBookings", 1, 50);
   const maxDaysAhead = int(formData, "maxDaysAhead", 1, 60);
   const registrationCode = String(formData.get("registrationCode") ?? "").trim();
+  const openDays = formData.getAll("openDays").map(String);
+  const closedWeekdays = ["0", "1", "2", "3", "4", "5", "6"].filter((d) => !openDays.includes(d)).join("");
 
   if (
     slotMinutes === null ||
@@ -27,16 +29,22 @@ export async function saveSettings(formData: FormData) {
     closeHour === null ||
     maxActiveBookings === null ||
     maxDaysAhead === null ||
-    (closeHour - openHour) * 60 < slotMinutes
+    (closeHour - openHour) * 60 < slotMinutes ||
+    closedWeekdays.length === 7
   ) {
     return done("dati-non-validi");
   }
 
-  await prisma.settings.upsert({
-    where: { id: 1 },
-    update: { slotMinutes, openHour, closeHour, maxActiveBookings, maxDaysAhead, registrationCode: registrationCode || null },
-    create: { id: 1, slotMinutes, openHour, closeHour, maxActiveBookings, maxDaysAhead, registrationCode: registrationCode || null },
-  });
+  const data = {
+    slotMinutes,
+    openHour,
+    closeHour,
+    closedWeekdays,
+    maxActiveBookings,
+    maxDaysAhead,
+    registrationCode: registrationCode || null,
+  };
+  await prisma.settings.upsert({ where: { id: 1 }, update: data, create: { id: 1, ...data } });
   done();
 }
 
