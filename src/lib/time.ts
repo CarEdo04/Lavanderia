@@ -64,7 +64,11 @@ export function weekday(day: string): number {
   return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
 }
 
-export const WEEKDAYS = ["Domenica", "Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato"];
+export function mondayOf(day: string): string {
+  return addDays(day, -((weekday(day) + 6) % 7));
+}
+
+export const WEEKDAYS =["Domenica", "Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato"];
 
 export function formatDuration(minutes: number): string {
   if (minutes % 60 !== 0) return `${minutes} minuti`;

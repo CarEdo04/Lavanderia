@@ -28,13 +28,7 @@ async function main() {
   });
 
   if ((await prisma.machine.count()) === 0) {
-    await prisma.machine.createMany({
-      data: [
-        { name: "Lavatrice 1", type: "WASHER", sortOrder: 1 },
-        { name: "Lavatrice 2", type: "WASHER", sortOrder: 2 },
-        { name: "Asciugatrice 1", type: "DRYER", sortOrder: 3 },
-      ],
-    });
+    await prisma.machine.create({ data: { name: "Lavanderia", type: "WASHER", sortOrder: 1 } });
   }
 
   console.log(`Seed completato. Admin: ${email}`);

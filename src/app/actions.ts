@@ -55,15 +55,25 @@ export async function logout() {
   redirect("/login");
 }
 
+// Query string that brings the user back to the same week and machine.
+function bookingPageParams(formData: FormData) {
+  const params = new URLSearchParams();
+  const week = formData.get("week");
+  const machineId = Number(formData.get("machineId"));
+  if (isValidDay(week)) params.set("settimana", week);
+  if (Number.isInteger(machineId) && machineId > 0) params.set("macchina", String(machineId));
+  return params;
+}
+
 export async function book(formData: FormData) {
   const user = await requireUser();
   const machineId = Number(formData.get("machineId"));
   const start = new Date(String(formData.get("start")));
-  const day = String(formData.get("day"));
 
   const result = await createBooking(user.id, machineId, start);
-  const dayParam = isValidDay(day) ? `giorno=${day}&` : "";
-  redirect(`/prenota?${dayParam}esito=${result}`);
+  const params = bookingPageParams(formData);
+  params.set("esito", result);
+  redirect(`/prenota?${params}`);
 }
 
 // Owners can cancel their own upcoming bookings; admins can cancel any.
@@ -71,15 +81,14 @@ export async function cancel(formData: FormData) {
   const user = await requireUser();
   const id = Number(formData.get("bookingId"));
   const back = String(formData.get("back"));
-  const day = String(formData.get("day"));
 
   const target =
-    back === "admin" && user.role === "ADMIN"
-      ? "/admin"
-      : back === "mie"
-        ? "/mie-prenotazioni"
-        : `/prenota${isValidDay(day) ? `?giorno=${day}` : ""}`;
-  const go = (esito: string) => redirect(`${target}${target.includes("?") ? "&" : "?"}esito=${esito}`);
+    back === "admin" && user.role === "ADMIN" ? "/admin" : back === "mie" ? "/mie-prenotazioni" : "/prenota";
+  const params = target === "/prenota" ? bookingPageParams(formData) : new URLSearchParams();
+  const go = (esito: string) => {
+    params.set("esito", esito);
+    redirect(`${target}?${params}`);
+  };
 
   const booking = Number.isInteger(id) ? await prisma.booking.findUnique({ where: { id } }) : null;
   if (!booking || (booking.userId !== user.id && user.role !== "ADMIN")) return go("non-trovata");

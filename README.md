@@ -1,10 +1,10 @@
 # Lavanderia
 
-A booking app for shared laundry machines (washers and dryers) in an apartment building or dorm. It works like SuperSaaS or Skedda, but is self-hosted and only does what a shared laundry room needs. The interface is in Italian.
+A booking app for a shared laundry room in an apartment building or dorm. It works like SuperSaaS or Skedda, but is self-hosted and only does what a shared laundry room needs. The interface is in Italian.
 
 ## Features
 
-- **Residents** sign up and log in, pick a day, and book a free slot on any machine from a grid of time slots × machines. They can cancel their own upcoming bookings from the grid or from *Le mie prenotazioni*.
+- **Residents** sign up and log in, then book a free shift from a week grid (days × shifts, like a paper booking sheet). On phones the week shows as one card per day. By default there are four 4-hour shifts, Monday to Saturday. They can cancel their own upcoming bookings from the grid or from *Le mie prenotazioni*.
 - **Booking rules** are enforced on the server:
   - no double bookings (an overlap check, backed by a unique index)
   - a maximum number of active bookings per person
@@ -39,12 +39,12 @@ Log in with `ADMIN_EMAIL` / `ADMIN_PASSWORD` from `.env`. In this checkout, a ra
 
 ```
 prisma/schema.prisma        data model: User, Machine, Booking, Settings
-prisma/seed.ts              default settings, first admin, three sample machines
+prisma/seed.ts              default settings, first admin, one laundry ("Lavanderia")
 src/lib/booking.ts          booking rules (createBooking)
 src/lib/time.ts             time zone and slot helpers
 src/lib/session.ts          login sessions, requireUser / requireAdmin
 src/app/actions.ts          login, register, logout, book, cancel
-src/app/prenota/            booking grid
+src/app/prenota/            weekly booking grid
 src/app/mie-prenotazioni/   the user's own bookings
 src/app/admin/              admin page and its actions
 ```
