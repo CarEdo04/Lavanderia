@@ -2,9 +2,10 @@
 
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { MACHINE_TYPES } from "@/lib/messages";
+import { MACHINE_TYPES, NOTICE_LEVELS } from "@/lib/messages";
 import { DEFAULT_RULES } from "@/lib/rules";
 import { requireAdmin } from "@/lib/session";
+import { addDays, isValidDay } from "@/lib/time";
 
 const done = (esito = "salvato"): never => redirect(`/admin?esito=${esito}`);
 
@@ -103,6 +104,37 @@ export async function saveRules(formData: FormData) {
   const rulesText = text && text !== DEFAULT_RULES ? text : null;
   await prisma.settings.upsert({ where: { id: 1 }, update: { rulesText }, create: { id: 1, rulesText } });
   done();
+}
+
+// Rejects well-formed but impossible dates such as 2026-02-31.
+const isRealDay = (day: string) => isValidDay(day) && addDays(day, 0) === day;
+
+export async function addNotice(formData: FormData) {
+  await requireAdmin();
+  const message = String(formData.get("message") ?? "").replace(/\r\n/g, "\n").trim();
+  const level = String(formData.get("level"));
+  const startDay = String(formData.get("startDay"));
+  const endDay = String(formData.get("endDay"));
+  if (
+    message.length < 1 ||
+    message.length > 500 ||
+    !(level in NOTICE_LEVELS) ||
+    !isRealDay(startDay) ||
+    !isRealDay(endDay) ||
+    endDay < startDay
+  ) {
+    return done("dati-non-validi");
+  }
+  await prisma.notice.create({ data: { message, level, startDay, endDay } });
+  done("avviso-pubblicato");
+}
+
+export async function deleteNotice(formData: FormData) {
+  await requireAdmin();
+  const id = int(formData, "id", 1, Number.MAX_SAFE_INTEGER);
+  if (id === null) return done("dati-non-validi");
+  await prisma.notice.deleteMany({ where: { id } });
+  done("avviso-rimosso");
 }
 
 // For residents who cannot receive the verification email.

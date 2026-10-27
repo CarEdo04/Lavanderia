@@ -1,14 +1,26 @@
 import { cancel } from "../actions";
-import { addMachine, deleteMachine, markVerified, saveRules, saveSettings, setRole, toggleMachine, updateMachine } from "./actions";
+import {
+  addMachine,
+  addNotice,
+  deleteMachine,
+  deleteNotice,
+  markVerified,
+  saveRules,
+  saveSettings,
+  setRole,
+  toggleMachine,
+  updateMachine,
+} from "./actions";
 import { Flash } from "@/components/Flash";
+import { NoticeBox } from "@/components/Notices";
 import { SubmitButton } from "@/components/SubmitButton";
 import { getSettings } from "@/lib/booking";
 import { prisma } from "@/lib/db";
-import { MACHINE_TYPES } from "@/lib/messages";
+import { MACHINE_TYPES, NOTICE_LEVELS } from "@/lib/messages";
 import { fullName } from "@/lib/people";
 import { rulesText } from "@/lib/rules";
 import { requireAdmin } from "@/lib/session";
-import { WEEKDAYS, dayOf, formatDate, formatDay, formatDuration, formatTime } from "@/lib/time";
+import { WEEKDAYS, addDays, dayOf, formatDate, formatDay, formatDuration, formatTime, today } from "@/lib/time";
 
 export const metadata = { title: "Gestione · Lavanderia" };
 
@@ -35,8 +47,9 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const admin = await requireAdmin();
   const { esito } = await searchParams;
   const now = new Date();
+  const first = today();
 
-  const [settings, machines, bookings, users] = await Promise.all([
+  const [settings, machines, bookings, users, notices] = await Promise.all([
     getSettings(),
     prisma.machine.findMany({
       orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
@@ -49,12 +62,69 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       take: 100,
     }),
     prisma.user.findMany({ orderBy: [{ lastName: "asc" }, { firstName: "asc" }] }),
+    // Expired notices drop off the list but stay in the database.
+    prisma.notice.findMany({ where: { endDay: { gte: first } }, orderBy: [{ startDay: "asc" }, { id: "asc" }] }),
   ]);
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold text-slate-900">Gestione</h1>
       <Flash code={esito} />
+
+      <section className={card}>
+        <h2 className={h2}>Avvisi</h2>
+        <p className="mb-3 text-sm text-slate-600">
+          Compaiono sopra la griglia di prenotazione nelle settimane che includono il periodo indicato.
+        </p>
+        {notices.length > 0 && (
+          <div className="mb-4 space-y-2">
+            {notices.map((n) => (
+              <NoticeBox key={n.id} notice={n}>
+                <form action={deleteNotice}>
+                  <input type="hidden" name="id" value={n.id} />
+                  <SubmitButton className={`${danger} bg-white`} confirm="Rimuovere questo avviso?">
+                    Rimuovi
+                  </SubmitButton>
+                </form>
+              </NoticeBox>
+            ))}
+          </div>
+        )}
+        <form action={addNotice} className="grid gap-3 border-t border-slate-200 pt-4 sm:grid-cols-3">
+          <label className="text-sm text-slate-700 sm:col-span-3">
+            Messaggio
+            <textarea
+              name="message"
+              required
+              rows={3}
+              maxLength={500}
+              placeholder="Es. Lavatrice guasta: il tecnico passa giovedì, turni sospesi fino ad allora."
+              className={`${field} mt-1 block w-full`}
+            />
+          </label>
+          <label className="text-sm text-slate-700">
+            Tipo
+            <select name="level" defaultValue="INFO" className={`${field} mt-1 block w-full`}>
+              {Object.entries(NOTICE_LEVELS).map(([k, label]) => (
+                <option key={k} value={k}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm text-slate-700">
+            Dal
+            <input name="startDay" type="date" required defaultValue={first} className={`${field} mt-1 block w-full`} />
+          </label>
+          <label className="text-sm text-slate-700">
+            Al
+            <input name="endDay" type="date" required defaultValue={addDays(first, 6)} className={`${field} mt-1 block w-full`} />
+          </label>
+          <div className="sm:col-span-3">
+            <SubmitButton className={primary}>Pubblica avviso</SubmitButton>
+          </div>
+        </form>
+      </section>
 
       <section className={card}>
         <h2 className={h2}>Regole di prenotazione</h2>

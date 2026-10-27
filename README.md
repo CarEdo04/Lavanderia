@@ -18,6 +18,7 @@ A booking app for a shared laundry room in an apartment building or dorm. It wor
   - set the slot length, opening hours, booking limits and an optional registration code
   - add, rename, reorder, disable or delete machines
   - see and cancel upcoming bookings
+  - publish notices (information or problem) for a date range; they appear above the booking grid in the weeks they cover, until they end or are removed
   - edit the laundry rules shown at registration and on the *Regolamento* page
   - see every user's details, confirm an email by hand, and promote other users to admin
   

@@ -3,6 +3,8 @@ export const ESITI: Record<string, { ok: boolean; text: string }> = {
   prenotata: { ok: true, text: "Prenotazione confermata." },
   annullata: { ok: true, text: "Prenotazione annullata." },
   salvato: { ok: true, text: "Modifiche salvate." },
+  "avviso-pubblicato": { ok: true, text: "Avviso pubblicato." },
+  "avviso-rimosso": { ok: true, text: "Avviso rimosso." },
   occupato: { ok: false, text: "Questo turno è già stato prenotato." },
   limite: { ok: false, text: "Hai raggiunto il numero massimo di prenotazioni attive. Annullane una per prenotare di nuovo." },
   passato: { ok: false, text: "Non puoi prenotare un turno già concluso." },
@@ -24,4 +26,9 @@ export const ESITI: Record<string, { ok: boolean; text: string }> = {
 export const MACHINE_TYPES: Record<string, string> = {
   WASHER: "Lavatrice",
   DRYER: "Asciugatrice",
+};
+
+export const NOTICE_LEVELS: Record<string, string> = {
+  INFO: "Informazione",
+  WARNING: "Problema / disservizio",
 };

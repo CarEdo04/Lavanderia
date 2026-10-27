@@ -48,6 +48,18 @@ model Booking {
   @@index([start, end])
 }
 
+// Admin announcement shown on the booking page for the weeks it overlaps.
+model Notice {
+  id        Int      @id @default(autoincrement())
+  message   String
+  level     String   @default("INFO") // INFO | WARNING
+  startDay  String // YYYY-MM-DD, Europe/Rome, inclusive
+  endDay    String // YYYY-MM-DD, inclusive
+  createdAt DateTime @default(now())
+
+  @@index([endDay])
+}
+
 // Single row (id = 1) holding the booking rules.
 model Settings {
   id                Int     @id @default(1)

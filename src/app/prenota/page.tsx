@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { book, cancel } from "../actions";
 import { Flash } from "@/components/Flash";
+import { Notices } from "@/components/Notices";
 import { SubmitButton } from "@/components/SubmitButton";
 import { getSettings, isTooLate } from "@/lib/booking";
 import { prisma } from "@/lib/db";
@@ -65,7 +66,7 @@ export default async function BookPage({
   const machine = machines.find((m) => String(m.id) === macchina) ?? machines[0];
   const machineParam = machines.length > 1 && machine ? `&macchina=${machine.id}` : "";
 
-  const [bookings, activeCount] = await Promise.all([
+  const [bookings, activeCount, notices] = await Promise.all([
     machine
       ? prisma.booking.findMany({
           where: { machineId: machine.id, start: { lt: localToUtc(addDays(week, 7), 0) }, end: { gt: localToUtc(week, 0) } },
@@ -73,6 +74,11 @@ export default async function BookPage({
         })
       : [],
     prisma.booking.count({ where: { userId: user.id, end: { gt: now } } }),
+    // Notices overlapping this week that have not ended yet.
+    prisma.notice.findMany({
+      where: { startDay: { lte: addDays(week, 6) }, endDay: { gte: week > first ? week : first } },
+      orderBy: [{ level: "desc" }, { startDay: "asc" }, { id: "asc" }],
+    }),
   ]);
   const atLimit = activeCount >= settings.maxActiveBookings;
 
@@ -210,6 +216,8 @@ export default async function BookPage({
           <span />
         )}
       </div>
+
+      <Notices notices={notices} />
 
       {!machine ? (
         <p className="rounded-lg border border-slate-200 bg-white p-6 text-slate-600">
