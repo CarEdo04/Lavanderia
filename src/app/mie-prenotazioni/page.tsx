@@ -3,13 +3,13 @@ import { cancel } from "../actions";
 import { Flash } from "@/components/Flash";
 import { SubmitButton } from "@/components/SubmitButton";
 import { prisma } from "@/lib/db";
-import { requireUser } from "@/lib/session";
+import { requireVerifiedUser } from "@/lib/session";
 import { dayOf, formatDay, formatTime } from "@/lib/time";
 
 export const metadata = { title: "Le mie prenotazioni · Lavanderia" };
 
 export default async function MyBookingsPage({ searchParams }: { searchParams: Promise<{ esito?: string }> }) {
-  const user = await requireUser();
+  const user = await requireVerifiedUser();
   const { esito } = await searchParams;
   const now = new Date();
 

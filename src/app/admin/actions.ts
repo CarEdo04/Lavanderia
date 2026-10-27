@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { MACHINE_TYPES } from "@/lib/messages";
+import { DEFAULT_RULES } from "@/lib/rules";
 import { requireAdmin } from "@/lib/session";
 
 const done = (esito = "salvato"): never => redirect(`/admin?esito=${esito}`);
@@ -87,6 +88,25 @@ export async function deleteMachine(formData: FormData) {
   const id = int(formData, "id", 1, Number.MAX_SAFE_INTEGER);
   if (id === null) return done("dati-non-validi");
   await prisma.machine.deleteMany({ where: { id } }); // bookings cascade
+  done();
+}
+
+export async function saveRules(formData: FormData) {
+  await requireAdmin();
+  const text = String(formData.get("rulesText") ?? "").replace(/\r\n/g, "\n").trim();
+  if (text.length > 5000) return done("dati-non-validi");
+  // Store null while the text matches the default, so it follows future updates.
+  const rulesText = text && text !== DEFAULT_RULES ? text : null;
+  await prisma.settings.upsert({ where: { id: 1 }, update: { rulesText }, create: { id: 1, rulesText } });
+  done();
+}
+
+// For residents who cannot receive the verification email.
+export async function markVerified(formData: FormData) {
+  await requireAdmin();
+  const id = int(formData, "id", 1, Number.MAX_SAFE_INTEGER);
+  if (id === null) return done("dati-non-validi");
+  await prisma.user.updateMany({ where: { id, emailVerifiedAt: null }, data: { emailVerifiedAt: new Date() } });
   done();
 }
 

@@ -1,12 +1,14 @@
 import { cancel } from "../actions";
-import { addMachine, deleteMachine, saveSettings, setRole, toggleMachine, updateMachine } from "./actions";
+import { addMachine, deleteMachine, markVerified, saveRules, saveSettings, setRole, toggleMachine, updateMachine } from "./actions";
 import { Flash } from "@/components/Flash";
 import { SubmitButton } from "@/components/SubmitButton";
 import { getSettings } from "@/lib/booking";
 import { prisma } from "@/lib/db";
 import { MACHINE_TYPES } from "@/lib/messages";
+import { fullName } from "@/lib/people";
+import { rulesText } from "@/lib/rules";
 import { requireAdmin } from "@/lib/session";
-import { WEEKDAYS, dayOf, formatDay, formatDuration, formatTime } from "@/lib/time";
+import { WEEKDAYS, dayOf, formatDate, formatDay, formatDuration, formatTime } from "@/lib/time";
 
 export const metadata = { title: "Gestione · Lavanderia" };
 
@@ -46,7 +48,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       orderBy: { start: "asc" },
       take: 100,
     }),
-    prisma.user.findMany({ orderBy: { name: "asc" } }),
+    prisma.user.findMany({ orderBy: [{ lastName: "asc" }, { firstName: "asc" }] }),
   ]);
 
   return (
@@ -107,6 +109,24 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           <div className="sm:col-span-3">
             <SubmitButton className={primary}>Salva regole</SubmitButton>
           </div>
+        </form>
+      </section>
+
+      <section className={card}>
+        <h2 className={h2}>Regolamento</h2>
+        <p className="mb-2 text-sm text-slate-600">
+          Chi si registra deve accettarlo. Lascia vuoto per usare il testo predefinito. Righe vuote separano i paragrafi.
+        </p>
+        <form action={saveRules} className="space-y-3">
+          <textarea
+            name="rulesText"
+            rows={10}
+            maxLength={5000}
+            defaultValue={rulesText(settings)}
+            aria-label="Testo del regolamento"
+            className={`${field} block w-full leading-relaxed`}
+          />
+          <SubmitButton className={primary}>Salva regolamento</SubmitButton>
         </form>
       </section>
 
@@ -172,14 +192,14 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                     </td>
                     <td className="py-2 pr-3">{b.machine.name}</td>
                     <td className="py-2 pr-3">
-                      {b.user.name}
-                      {b.user.apartment && <span className="text-slate-500"> ({b.user.apartment})</span>}
+                      {fullName(b.user)}
+                      {b.user.room && <span className="text-slate-500"> (stanza {b.user.room})</span>}
                     </td>
                     <td className="py-2 text-right">
                       <form action={cancel}>
                         <input type="hidden" name="bookingId" value={b.id} />
                         <input type="hidden" name="back" value="admin" />
-                        <SubmitButton className={danger} confirm={`Annullare la prenotazione di ${b.user.name}?`}>
+                        <SubmitButton className={danger} confirm={`Annullare la prenotazione di ${fullName(b.user)}?`}>
                           Annulla
                         </SubmitButton>
                       </form>
@@ -194,25 +214,70 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
       <section className={card}>
         <h2 className={h2}>Utenti ({users.length})</h2>
-        <ul className="divide-y divide-slate-100 text-sm">
-          {users.map((u) => (
-            <li key={u.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
-              <div>
-                <span className="font-medium text-slate-900">{u.name}</span>
-                {u.apartment && <span className="text-slate-500"> · int. {u.apartment}</span>}
-                <span className="text-slate-500"> · {u.email}</span>
-                {u.role === "ADMIN" && <span className="ml-2 rounded bg-sky-100 px-2 py-0.5 text-xs text-sky-800">Admin</span>}
-              </div>
-              {u.id !== admin.id && (
-                <form action={setRole}>
-                  <input type="hidden" name="id" value={u.id} />
-                  <input type="hidden" name="role" value={u.role === "ADMIN" ? "USER" : "ADMIN"} />
-                  <SubmitButton className={secondary}>{u.role === "ADMIN" ? "Rimuovi admin" : "Rendi admin"}</SubmitButton>
-                </form>
-              )}
-            </li>
-          ))}
-        </ul>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 text-left text-slate-500">
+                <th className="py-2 pr-3 font-medium">Nome</th>
+                <th className="py-2 pr-3 font-medium">Cognome</th>
+                <th className="py-2 pr-3 font-medium">Username</th>
+                <th className="py-2 pr-3 font-medium">Email</th>
+                <th className="py-2 pr-3 font-medium">Stanza</th>
+                <th className="py-2 pr-3 font-medium">Regolamento</th>
+                <th className="py-2 pr-3 font-medium">Registrato il</th>
+                <th className="py-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((u) => (
+                <tr key={u.id} className="border-b border-slate-100 align-top last:border-0">
+                  <td className="py-2 pr-3 font-medium text-slate-900">
+                    {u.firstName}
+                    {u.role === "ADMIN" && <span className="ml-2 rounded bg-sky-100 px-2 py-0.5 text-xs font-normal text-sky-800">Admin</span>}
+                  </td>
+                  <td className="py-2 pr-3">{u.lastName || <span className="text-slate-400">—</span>}</td>
+                  <td className="py-2 pr-3">{u.username ?? <span className="text-slate-400">—</span>}</td>
+                  <td className="py-2 pr-3">
+                    <div>{u.email}</div>
+                    {u.emailVerifiedAt ? (
+                      <span className="text-xs text-emerald-700">verificata</span>
+                    ) : (
+                      <span className="text-xs text-amber-700">da verificare</span>
+                    )}
+                  </td>
+                  <td className="py-2 pr-3">{u.room ?? <span className="text-slate-400">—</span>}</td>
+                  <td className="py-2 pr-3 whitespace-nowrap">
+                    {u.rulesAcceptedAt ? (
+                      `accettato il ${formatDate(u.rulesAcceptedAt)}`
+                    ) : (
+                      <span className="text-slate-400">non accettato</span>
+                    )}
+                  </td>
+                  <td className="py-2 pr-3 whitespace-nowrap tabular-nums">{formatDate(u.createdAt)}</td>
+                  <td className="py-2">
+                    <div className="flex justify-end gap-2">
+                      {!u.emailVerifiedAt && (
+                        <form action={markVerified}>
+                          <input type="hidden" name="id" value={u.id} />
+                          <SubmitButton className={secondary}>Conferma email</SubmitButton>
+                        </form>
+                      )}
+                      {u.id !== admin.id && (
+                        <form action={setRole}>
+                          <input type="hidden" name="id" value={u.id} />
+                          <input type="hidden" name="role" value={u.role === "ADMIN" ? "USER" : "ADMIN"} />
+                          <SubmitButton className={`${secondary} whitespace-nowrap`}>
+                            {u.role === "ADMIN" ? "Rimuovi admin" : "Rendi admin"}
+                          </SubmitButton>
+                        </form>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
     </div>
   );

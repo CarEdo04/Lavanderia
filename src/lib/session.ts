@@ -7,12 +7,14 @@ import { prisma } from "./db";
 const COOKIE = "sessione";
 const MAX_AGE = 60 * 60 * 24 * 30; // 30 days
 
-function secretKey() {
+// Other token types (e.g. email verification) get their own derived key, so
+// they can never be accepted as a session cookie.
+export function secretKey(purpose: "session" | "verify-email" = "session") {
   const secret = process.env.SESSION_SECRET;
   if (!secret || secret.length < 32) {
     throw new Error("SESSION_SECRET mancante o troppo corta (minimo 32 caratteri)");
   }
-  return new TextEncoder().encode(secret);
+  return new TextEncoder().encode(purpose === "session" ? secret : `${secret}:${purpose}`);
 }
 
 export async function createSession(userId: number) {
@@ -34,7 +36,15 @@ export async function destroySession() {
   (await cookies()).delete(COOKIE);
 }
 
-export type CurrentUser = { id: number; email: string; name: string; apartment: string | null; role: string };
+export type CurrentUser = {
+  id: number;
+  email: string;
+  firstName: string;
+  lastName: string;
+  room: string | null;
+  role: string;
+  emailVerifiedAt: Date | null;
+};
 
 // The role is read from the database on every request, so promotions and
 // demotions take effect immediately.
@@ -50,7 +60,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   }
   return prisma.user.findUnique({
     where: { id: uid },
-    select: { id: true, email: true, name: true, apartment: true, role: true },
+    select: { id: true, email: true, firstName: true, lastName: true, room: true, role: true, emailVerifiedAt: true },
   });
 });
 
@@ -60,8 +70,15 @@ export async function requireUser() {
   return user;
 }
 
-export async function requireAdmin() {
+// Accounts must confirm their email address before they can book.
+export async function requireVerifiedUser() {
   const user = await requireUser();
+  if (!user.emailVerifiedAt) redirect("/verifica-email");
+  return user;
+}
+
+export async function requireAdmin() {
+  const user = await requireVerifiedUser();
   if (user.role !== "ADMIN") redirect("/prenota");
   return user;
 }

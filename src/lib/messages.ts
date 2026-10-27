@@ -13,6 +13,11 @@ export const ESITI: Record<string, { ok: boolean; text: string }> = {
   "gia-conclusa": { ok: false, text: "Non puoi annullare una prenotazione già conclusa." },
   "dati-non-validi": { ok: false, text: "Dati non validi. Controlla i campi e riprova." },
   "se-stesso": { ok: false, text: "Non puoi cambiare il tuo ruolo." },
+  "email-verificata": { ok: true, text: "Email confermata. Ora puoi prenotare." },
+  "email-inviata": { ok: true, text: "Ti abbiamo inviato una nuova email di conferma." },
+  attendi: { ok: false, text: "Hai appena ricevuto un'email: attendi un minuto prima di chiederne un'altra." },
+  "invio-fallito": { ok: false, text: "Non è stato possibile inviare l'email. Riprova più tardi o contatta l'amministratore." },
+  "link-non-valido": { ok: false, text: "Il link di conferma non è valido o è scaduto. Accedi e chiedine uno nuovo." },
 };
 
 export const MACHINE_TYPES: Record<string, string> = {

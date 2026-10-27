@@ -4,7 +4,8 @@ import { Flash } from "@/components/Flash";
 import { SubmitButton } from "@/components/SubmitButton";
 import { getSettings } from "@/lib/booking";
 import { prisma } from "@/lib/db";
-import { requireUser } from "@/lib/session";
+import { fullName } from "@/lib/people";
+import { requireVerifiedUser } from "@/lib/session";
 import {
   addDays,
   formatDay,
@@ -26,7 +27,7 @@ export default async function BookPage({
 }: {
   searchParams: Promise<{ settimana?: string; macchina?: string; esito?: string }>;
 }) {
-  const user = await requireUser();
+  const user = await requireVerifiedUser();
   const { settimana, macchina, esito } = await searchParams;
   const settings = await getSettings();
   const isAdmin = user.role === "ADMIN";
@@ -63,7 +64,7 @@ export default async function BookPage({
     machine
       ? prisma.booking.findMany({
           where: { machineId: machine.id, start: { lt: localToUtc(addDays(week, 7), 0) }, end: { gt: localToUtc(week, 0) } },
-          include: { user: { select: { name: true, apartment: true } } },
+          include: { user: { select: { firstName: true, lastName: true, room: true } } },
         })
       : [],
     prisma.booking.count({ where: { userId: user.id, end: { gt: now } } }),
@@ -104,10 +105,10 @@ export default async function BookPage({
         <div className="flex min-h-11 flex-col justify-center rounded-md bg-slate-100 px-2 py-1.5 text-slate-600">
           {isAdmin ? (
             <>
-              <span className="truncate font-medium text-slate-800" title={b.user.name}>
-                {b.user.name}
+              <span className="truncate font-medium text-slate-800" title={fullName(b.user)}>
+                {fullName(b.user)}
               </span>
-              {b.user.apartment && <span className="text-xs">int. {b.user.apartment}</span>}
+              {b.user.room && <span className="text-xs">stanza {b.user.room}</span>}
             </>
           ) : (
             "Occupato"

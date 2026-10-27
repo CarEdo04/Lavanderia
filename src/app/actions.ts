@@ -4,50 +4,104 @@ import bcrypt from "bcryptjs";
 import { redirect } from "next/navigation";
 import { createBooking, getSettings } from "@/lib/booking";
 import { prisma } from "@/lib/db";
-import { createSession, destroySession, requireUser } from "@/lib/session";
+import { createSession, destroySession, requireUser, requireVerifiedUser } from "@/lib/session";
 import { isValidDay } from "@/lib/time";
+import { sendVerificationEmail } from "@/lib/verification";
 
-export type FormState = { error?: string } | undefined;
+// `values` echoes the submitted fields (never the password) so the form can
+// be refilled after an error.
+export type FormState = { error?: string; values?: Record<string, string> } | undefined;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const USERNAME_RE = /^[a-z0-9._-]{3,30}$/;
+const ROOM_RE = /^[A-Za-z0-9 /-]{1,10}$/;
+const RESEND_AFTER_MS = 60_000;
 
+// Log in with either the email address or the optional username.
 export async function login(_: FormState, formData: FormData): Promise<FormState> {
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const identifier = String(formData.get("identifier") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
 
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await prisma.user.findUnique({
+    where: identifier.includes("@") ? { email: identifier } : { username: identifier },
+  });
   if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
-    return { error: "Email o password non corretti." };
+    return { error: "Credenziali non corrette.", values: { identifier } };
   }
   await createSession(user.id);
   redirect("/prenota");
 }
 
 export async function register(_: FormState, formData: FormData): Promise<FormState> {
-  const name = String(formData.get("name") ?? "").trim();
-  const apartment = String(formData.get("apartment") ?? "").trim();
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const values = {
+    firstName: String(formData.get("firstName") ?? "").trim(),
+    lastName: String(formData.get("lastName") ?? "").trim(),
+    email: String(formData.get("email") ?? "").trim().toLowerCase(),
+    username: String(formData.get("username") ?? "").trim().toLowerCase(),
+    room: String(formData.get("room") ?? "").trim(),
+  };
   const password = String(formData.get("password") ?? "");
   const code = String(formData.get("code") ?? "").trim();
+  const acceptedRules = formData.get("rules") === "si";
+  const fail = (error: string): FormState => ({ error, values });
 
-  if (name.length < 2 || name.length > 60) return { error: "Inserisci un nome valido." };
-  if (apartment.length > 20) return { error: "Interno troppo lungo." };
-  if (!EMAIL_RE.test(email)) return { error: "Inserisci un indirizzo email valido." };
-  if (password.length < 8) return { error: "La password deve avere almeno 8 caratteri." };
+  if (values.firstName.length < 1 || values.firstName.length > 40) return fail("Inserisci il tuo nome.");
+  if (values.lastName.length < 1 || values.lastName.length > 40) return fail("Inserisci il tuo cognome.");
+  if (!EMAIL_RE.test(values.email)) return fail("Inserisci un indirizzo email valido.");
+  if (values.username && !USERNAME_RE.test(values.username)) {
+    return fail("Lo username deve avere 3–30 caratteri tra lettere, numeri, punto, trattino e trattino basso.");
+  }
+  if (password.length < 8) return fail("La password deve avere almeno 8 caratteri.");
+  if (!ROOM_RE.test(values.room)) return fail("Inserisci il numero della tua stanza.");
+  if (!acceptedRules) return fail("Per registrarti devi accettare il regolamento.");
 
   const settings = await getSettings();
   if (settings.registrationCode && code !== settings.registrationCode) {
-    return { error: "Codice di registrazione non corretto. Chiedilo all'amministratore." };
+    return fail("Codice di registrazione non corretto. Chiedilo all'amministratore.");
   }
-  if (await prisma.user.findUnique({ where: { email } })) {
-    return { error: "Esiste già un account con questa email." };
+  if (await prisma.user.findUnique({ where: { email: values.email } })) {
+    return fail("Esiste già un account con questa email.");
+  }
+  if (values.username && (await prisma.user.findUnique({ where: { username: values.username } }))) {
+    return fail("Questo username è già in uso.");
   }
 
   const user = await prisma.user.create({
-    data: { name, apartment: apartment || null, email, passwordHash: await bcrypt.hash(password, 10) },
+    data: {
+      firstName: values.firstName,
+      lastName: values.lastName,
+      email: values.email,
+      username: values.username || null,
+      room: values.room,
+      passwordHash: await bcrypt.hash(password, 10),
+      rulesAcceptedAt: new Date(),
+    },
   });
+  try {
+    await sendVerificationEmail(user);
+  } catch (e) {
+    // The account exists; the user can ask for a new email from /verifica-email.
+    console.error("Invio email di verifica non riuscito", e);
+  }
   await createSession(user.id);
-  redirect("/prenota");
+  redirect("/verifica-email");
+}
+
+export async function resendVerification() {
+  const user = await requireUser();
+  if (user.emailVerifiedAt) redirect("/prenota");
+
+  const { verificationSentAt } = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+  if (verificationSentAt && Date.now() - verificationSentAt.getTime() < RESEND_AFTER_MS) {
+    redirect("/verifica-email?esito=attendi");
+  }
+  try {
+    await sendVerificationEmail(user);
+  } catch (e) {
+    console.error("Invio email di verifica non riuscito", e);
+    redirect("/verifica-email?esito=invio-fallito");
+  }
+  redirect("/verifica-email?esito=email-inviata");
 }
 
 export async function logout() {
@@ -66,7 +120,7 @@ function bookingPageParams(formData: FormData) {
 }
 
 export async function book(formData: FormData) {
-  const user = await requireUser();
+  const user = await requireVerifiedUser();
   const machineId = Number(formData.get("machineId"));
   const start = new Date(String(formData.get("start")));
 
@@ -78,7 +132,7 @@ export async function book(formData: FormData) {
 
 // Owners can cancel their own upcoming bookings; admins can cancel any.
 export async function cancel(formData: FormData) {
-  const user = await requireUser();
+  const user = await requireVerifiedUser();
   const id = Number(formData.get("bookingId"));
   const back = String(formData.get("back"));
 

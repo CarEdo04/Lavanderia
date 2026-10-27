@@ -21,7 +21,9 @@ async function main() {
     update: {},
     create: {
       email,
-      name: "Amministratore",
+      firstName: "Amministratore",
+      lastName: "",
+      emailVerifiedAt: new Date(),
       role: "ADMIN",
       passwordHash: await bcrypt.hash(password, 10),
     },

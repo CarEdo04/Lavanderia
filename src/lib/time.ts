@@ -54,6 +54,10 @@ export function formatDay(day: string, opts: Intl.DateTimeFormatOptions = { week
   return new Intl.DateTimeFormat("it-IT", { ...opts, timeZone: "UTC" }).format(new Date(Date.UTC(y, m - 1, d)));
 }
 
+export function formatDate(date: Date): string {
+  return new Intl.DateTimeFormat("it-IT", { timeZone: TZ, day: "2-digit", month: "2-digit", year: "numeric" }).format(date);
+}
+
 export function formatTime(date: Date): string {
   return new Intl.DateTimeFormat("it-IT", { timeZone: TZ, hour: "2-digit", minute: "2-digit" }).format(date);
 }

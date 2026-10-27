@@ -8,14 +8,19 @@ datasource db {
 }
 
 model User {
-  id           Int       @id @default(autoincrement())
-  email        String    @unique
-  name         String
-  apartment    String?
-  passwordHash String
-  role         String    @default("USER") // USER | ADMIN
-  createdAt    DateTime  @default(now())
-  bookings     Booking[]
+  id                 Int       @id @default(autoincrement())
+  firstName          String
+  lastName           String
+  email              String    @unique
+  emailVerifiedAt    DateTime?
+  verificationSentAt DateTime?
+  username           String?   @unique // optional, lowercase, can be used to log in
+  passwordHash       String
+  room               String?
+  rulesAcceptedAt    DateTime?
+  role               String    @default("USER") // USER | ADMIN
+  createdAt          DateTime  @default(now()) // registration date
+  bookings           Booking[]
 }
 
 model Machine {
@@ -53,4 +58,5 @@ model Settings {
   maxActiveBookings Int     @default(3)
   maxDaysAhead      Int     @default(7)
   registrationCode  String?
+  rulesText         String? // null = default rules in src/lib/rules.ts
 }

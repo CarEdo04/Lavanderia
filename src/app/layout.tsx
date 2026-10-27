@@ -42,6 +42,9 @@ export default async function RootLayout({
                 <Link href="/mie-prenotazioni" className={link}>
                   Le mie prenotazioni
                 </Link>
+                <Link href="/regolamento" className={link}>
+                  Regolamento
+                </Link>
                 {user.role === "ADMIN" && (
                   <Link href="/admin" className={link}>
                     Gestione
@@ -49,7 +52,7 @@ export default async function RootLayout({
                 )}
                 <form action={logout}>
                   <button className="rounded-md px-2.5 py-1.5 text-slate-500 hover:bg-slate-100">
-                    Esci ({user.name.split(" ")[0]})
+                    Esci ({user.firstName})
                   </button>
                 </form>
               </nav>

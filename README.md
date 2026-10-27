@@ -4,7 +4,10 @@ A booking app for a shared laundry room in an apartment building or dorm. It wor
 
 ## Features
 
-- **Residents** sign up and log in, then book a free shift from a week grid (days × shifts, like a paper booking sheet). On phones the week shows as one card per day. By default there are four 4-hour shifts, Monday to Saturday. They can cancel their own upcoming bookings from the grid or from *Le mie prenotazioni*.
+- **Registration** asks for first name, surname, email, an optional username, password and room number, and the resident must accept the laundry rules. The registration date and the time the rules were accepted are stored.
+- **Email verification**: after signing up, residents get an email with a confirmation link (valid 48 hours) and can only book once they've clicked it. They can ask for a new email at most once a minute. Without SMTP settings, the email is printed in the dev server console instead.
+- **Login** works with either the email address or the username.
+- **Residents** book a free shift from a week grid (days × shifts, like a paper booking sheet). On phones the week shows as one card per day. By default there are four 4-hour shifts, Monday to Saturday. They can cancel their own upcoming bookings from the grid or from *Le mie prenotazioni*.
 - **Booking rules** are enforced on the server:
   - no double bookings (an overlap check, backed by a unique index)
   - a maximum number of active bookings per person
@@ -15,14 +18,15 @@ A booking app for a shared laundry room in an apartment building or dorm. It wor
   - set the slot length, opening hours, booking limits and an optional registration code
   - add, rename, reorder, disable or delete machines
   - see and cancel upcoming bookings
-  - promote other users to admin
+  - edit the laundry rules shown at registration and on the *Regolamento* page
+  - see every user's details, confirm an email by hand, and promote other users to admin
   
   On the booking grid, admins also see who booked each slot. Residents only see "Occupato".
 - All slot times use the `Europe/Rome` time zone (`src/lib/time.ts`), wherever the server runs. This includes the daylight-saving switch days.
 
 ## Stack
 
-Next.js 15 (App Router, server actions) · TypeScript · Tailwind CSS 4 · Prisma 6 + SQLite · signed-cookie sessions (`jose`) · `bcryptjs` password hashing.
+Next.js 15 (App Router, server actions) · TypeScript · Tailwind CSS 4 · Prisma 6 + SQLite · signed-cookie sessions (`jose`) · `bcryptjs` password hashing · `nodemailer` for email.
 
 ## Getting started
 
@@ -53,5 +57,6 @@ src/app/admin/              admin page and its actions
 
 - Use PostgreSQL instead of SQLite on a hosted server: change the `provider` in `schema.prisma` and set `DATABASE_URL`. SQLite is fine for a single small server.
 - Use a long random `SESSION_SECRET` and serve the app over HTTPS.
+- Set `APP_URL` to the public address and fill in the `SMTP_*` settings, so verification emails are actually sent.
 - Set a registration code in *Gestione* so only residents can sign up.
 - Ideas for later: email reminders, password reset, recurring bookings, closed days, and a "machine broken" report button.
