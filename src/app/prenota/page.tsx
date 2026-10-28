@@ -2,6 +2,7 @@ import Link from "next/link";
 import { book, cancel } from "../actions";
 import { Flash } from "@/components/Flash";
 import { Notices } from "@/components/Notices";
+import { ScrollHere } from "@/components/ScrollHere";
 import { SubmitButton } from "@/components/SubmitButton";
 import { getSettings, isTooLate } from "@/lib/booking";
 import { prisma } from "@/lib/db";
@@ -40,49 +41,50 @@ export default async function BookPage({
   const now = new Date();
   const first = today();
   const lastDay = addDays(first, Math.max(1, settings.maxDaysAhead) - 1);
+  const inWindow = (day: string) => day >= first && day <= lastDay;
 
-  const openDays = (monday: string) =>
-    Array.from({ length: 7 }, (_, i) => addDays(monday, i))
+  // Every calendar week with an open day in the booking window, one under the
+  // other. Days outside the window stay in the grid so the weeks line up.
+  const weeks: { monday: string; days: { day: string; slots: Slot[] }[] }[] = [];
+  for (let monday = mondayOf(first); monday <= lastDay; monday = addDays(monday, 7)) {
+    const days = Array.from({ length: 7 }, (_, i) => addDays(monday, i))
       .map((day) => ({ day, slots: slotsForDay(day, settings) }))
       .filter((d) => d.slots.length > 0);
-
-  // Weeks that overlap the booking window; open on the first one that still
-  // has a bookable shift.
-  const weeks: string[] = [];
-  for (let w = mondayOf(first); w <= mondayOf(lastDay); w = addDays(w, 7)) weeks.push(w);
-  const hasBookable = (monday: string) =>
-    openDays(monday).some(({ day, slots }) => day <= lastDay && slots.some((s) => !isTooLate(s, settings, now)));
-  const week = settimana && weeks.includes(settimana) ? settimana : (weeks.find(hasBookable) ?? weeks[0]);
-  const prevWeek = weeks[weeks.indexOf(week) - 1];
-  const nextWeek = weeks[weeks.indexOf(week) + 1];
-
-  const days = openDays(week);
-  const rowLabels = days.reduce<Slot[]>((longest, d) => (d.slots.length > longest.length ? d.slots : longest), []);
+    if (days.some((d) => inWindow(d.day))) weeks.push({ monday, days });
+  }
+  // The week an action came from shows its outcome; otherwise it goes on top.
+  const flashWeek = weeks.some((w) => w.monday === settimana) ? settimana : undefined;
 
   const machines = await prisma.machine.findMany({
     where: { active: true },
     orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
   });
   const machine = machines.find((m) => String(m.id) === macchina) ?? machines[0];
-  const machineParam = machines.length > 1 && machine ? `&macchina=${machine.id}` : "";
+  const rangeStart = localToUtc(mondayOf(first), 0);
+  const rangeEnd = localToUtc(addDays(mondayOf(lastDay), 7), 0);
 
   const [bookings, activeCount, notices] = await Promise.all([
     machine
       ? prisma.booking.findMany({
-          where: { machineId: machine.id, start: { lt: localToUtc(addDays(week, 7), 0) }, end: { gt: localToUtc(week, 0) } },
+          where: { machineId: machine.id, start: { lt: rangeEnd }, end: { gt: rangeStart } },
           include: { user: { select: { firstName: true, lastName: true, room: true } } },
         })
       : [],
     prisma.booking.count({ where: { userId: user.id, end: { gt: now } } }),
-    // Notices overlapping this week that have not ended yet.
     prisma.notice.findMany({
-      where: { startDay: { lte: addDays(week, 6) }, endDay: { gte: week > first ? week : first } },
+      where: { startDay: { lte: lastDay }, endDay: { gte: first } },
       orderBy: [{ level: "desc" }, { startDay: "asc" }, { id: "asc" }],
     }),
   ]);
   const atLimit = activeCount >= settings.maxActiveBookings;
 
-  function cell(day: string, slot: Slot) {
+  // Notices still running in the given week.
+  const noticesFor = (monday: string) => {
+    const from = monday > first ? monday : first;
+    return notices.filter((n) => n.startDay <= addDays(monday, 6) && n.endDay >= from);
+  };
+
+  function cell(week: string, day: string, slot: Slot) {
     const b = bookings.find((b) => b.start < slot.end && b.end > slot.start);
     const past = slot.end <= now;
 
@@ -153,6 +155,7 @@ export default async function BookPage({
         <input type="hidden" name="start" value={slot.start.toISOString()} />
         <input type="hidden" name="week" value={week} />
         <SubmitButton
+          confirm={`Confermi la prenotazione di ${formatDay(day, { weekday: "long", day: "numeric", month: "long" })}, ${formatTime(slot.start)}–${formatTime(slot.end)}?`}
           className={`min-h-11 w-full rounded-md border px-2 py-1.5 font-medium ${
             atLimit
               ? "border-slate-200 text-slate-400"
@@ -165,7 +168,95 @@ export default async function BookPage({
     );
   }
 
-  const navLink = "rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 hover:border-sky-300";
+  function weekSection({ monday, days }: (typeof weeks)[number]) {
+    const rowLabels = days.reduce<Slot[]>((longest, d) => (d.slots.length > longest.length ? d.slots : longest), []);
+    const range = `${shortDate(monday)} – ${shortDate(addDays(monday, 6))}`;
+    return (
+      <section key={monday} id={`settimana-${monday}`} aria-labelledby={`titolo-${monday}`} className="scroll-mt-4">
+        <h2 id={`titolo-${monday}`} className="mb-3 font-semibold text-slate-900">
+          Settimana {range}
+        </h2>
+        {flashWeek === monday && (
+          <>
+            <ScrollHere />
+            <Flash code={esito} />
+          </>
+        )}
+        <Notices notices={noticesFor(monday)} />
+
+        {/* Phones: one card per day, only the days that can still be seen */}
+        <div className="space-y-3 sm:hidden">
+          {days
+            .filter(({ day }) => inWindow(day))
+            .map(({ day, slots }) => (
+              <section key={day} className="rounded-xl border border-slate-200 bg-white">
+                <h3 className="border-b border-slate-100 px-4 py-2 font-semibold capitalize text-slate-900">
+                  {formatDay(day, { weekday: "long", day: "numeric", month: "long" })}
+                  {day === first && <span className="ml-2 text-sm font-normal normal-case text-sky-700">oggi</span>}
+                </h3>
+                <ul className="divide-y divide-slate-100">
+                  {slots.map((slot) => (
+                    <li key={slot.start.toISOString()} className="flex items-center gap-3 px-3 py-1.5 text-sm">
+                      <span className="w-24 shrink-0 tabular-nums text-slate-600">
+                        {formatTime(slot.start)}–{formatTime(slot.end)}
+                      </span>
+                      <div className="min-w-0 flex-1">{cell(monday, day, slot)}</div>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ))}
+        </div>
+
+        {/* Larger screens: the whole week as one grid, so the weeks line up */}
+        <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white sm:block">
+          <table className="w-full min-w-[640px] table-fixed border-collapse text-sm">
+            <caption className="sr-only">Turni della settimana {range}</caption>
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50">
+                <th scope="col" className="sticky left-0 z-10 w-28 bg-slate-50 px-3 py-2 text-left font-medium text-slate-500">
+                  Orario
+                </th>
+                {days.map(({ day }) => (
+                  <th
+                    key={day}
+                    scope="col"
+                    aria-current={day === first ? "date" : undefined}
+                    className={`px-2 py-2 text-left capitalize ${
+                      day === first ? "text-sky-700" : inWindow(day) ? "text-slate-900" : "text-slate-400"
+                    }`}
+                  >
+                    <div className="font-semibold">{formatDay(day, { weekday: "long" })}</div>
+                    <div className="text-xs font-normal text-slate-500">
+                      {formatDay(day, { day: "numeric", month: "short" })}
+                      {day === first && " · oggi"}
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rowLabels.map((label, i) => (
+                <tr key={i} className="border-b border-slate-100 last:border-0">
+                  <th
+                    scope="row"
+                    className="sticky left-0 z-10 whitespace-nowrap bg-white px-3 py-1.5 text-left font-normal tabular-nums text-slate-600"
+                  >
+                    {formatTime(label.start)}–{formatTime(label.end)}
+                  </th>
+                  {days.map(({ day, slots }) => (
+                    <td key={day} className="px-1.5 py-1.5 align-top">
+                      {slots[i] && cell(monday, day, slots[i])}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <div>
@@ -178,14 +269,14 @@ export default async function BookPage({
         in anticipo.
       </p>
 
-      <Flash code={esito} />
+      {!flashWeek && <Flash code={esito} />}
 
       {machines.length > 1 && (
         <nav aria-label="Scegli la macchina" className="mb-4 flex flex-wrap gap-2">
           {machines.map((m) => (
             <Link
               key={m.id}
-              href={`/prenota?settimana=${week}&macchina=${m.id}`}
+              href={`/prenota?macchina=${m.id}`}
               aria-current={m.id === machine?.id ? "page" : undefined}
               className={`rounded-lg border px-3 py-1.5 text-sm ${
                 m.id === machine?.id ? "border-sky-600 bg-sky-600 text-white" : "border-slate-200 bg-white text-slate-700"
@@ -197,105 +288,14 @@ export default async function BookPage({
         </nav>
       )}
 
-      <div className="mb-4 flex items-center justify-between gap-2">
-        {prevWeek ? (
-          <Link href={`/prenota?settimana=${prevWeek}${machineParam}`} className={navLink}>
-            ‹ <span className="hidden sm:inline">Settimana precedente</span>
-          </Link>
-        ) : (
-          <span />
-        )}
-        <h2 className="text-center font-semibold text-slate-900">
-          Settimana {shortDate(week)} – {shortDate(addDays(week, 6))}
-        </h2>
-        {nextWeek ? (
-          <Link href={`/prenota?settimana=${nextWeek}${machineParam}`} className={navLink}>
-            <span className="hidden sm:inline">Settimana successiva</span> ›
-          </Link>
-        ) : (
-          <span />
-        )}
-      </div>
-
-      <Notices notices={notices} />
-
       {!machine ? (
         <p className="rounded-lg border border-slate-200 bg-white p-6 text-slate-600">
           La lavanderia non è disponibile al momento.
         </p>
-      ) : days.length === 0 ? (
-        <p className="rounded-lg border border-slate-200 bg-white p-6 text-slate-600">Nessun turno in questa settimana.</p>
+      ) : weeks.length === 0 ? (
+        <p className="rounded-lg border border-slate-200 bg-white p-6 text-slate-600">Nessun turno prenotabile.</p>
       ) : (
-        <>
-          {/* Phones: one card per day */}
-          <div className="space-y-3 sm:hidden">
-            {days.map(({ day, slots }) => (
-              <section key={day} className="rounded-xl border border-slate-200 bg-white">
-                <h3 className="border-b border-slate-100 px-4 py-2 font-semibold capitalize text-slate-900">
-                  {formatDay(day, { weekday: "long", day: "numeric", month: "long" })}
-                  {day === first && <span className="ml-2 text-sm font-normal normal-case text-sky-700">oggi</span>}
-                </h3>
-                <ul className="divide-y divide-slate-100">
-                  {slots.map((slot) => (
-                    <li key={slot.start.toISOString()} className="flex items-center gap-3 px-3 py-1.5 text-sm">
-                      <span className="w-24 shrink-0 tabular-nums text-slate-600">
-                        {formatTime(slot.start)}–{formatTime(slot.end)}
-                      </span>
-                      <div className="min-w-0 flex-1">{cell(day, slot)}</div>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ))}
-          </div>
-
-          {/* Larger screens: the whole week as one grid */}
-          <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white sm:block">
-            <table className="w-full min-w-[640px] table-fixed border-collapse text-sm">
-              <caption className="sr-only">
-                Turni della settimana dal {shortDate(week)} al {shortDate(addDays(week, 6))}
-              </caption>
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50">
-                  <th scope="col" className="sticky left-0 z-10 w-28 bg-slate-50 px-3 py-2 text-left font-medium text-slate-500">
-                    Orario
-                  </th>
-                  {days.map(({ day }) => (
-                    <th
-                      key={day}
-                      scope="col"
-                      aria-current={day === first ? "date" : undefined}
-                      className={`px-2 py-2 text-left capitalize ${day === first ? "text-sky-700" : "text-slate-900"}`}
-                    >
-                      <div className="font-semibold">{formatDay(day, { weekday: "long" })}</div>
-                      <div className="text-xs font-normal text-slate-500">
-                        {formatDay(day, { day: "numeric", month: "short" })}
-                        {day === first && " · oggi"}
-                      </div>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {rowLabels.map((label, i) => (
-                  <tr key={i} className="border-b border-slate-100 last:border-0">
-                    <th
-                      scope="row"
-                      className="sticky left-0 z-10 whitespace-nowrap bg-white px-3 py-1.5 text-left font-normal tabular-nums text-slate-600"
-                    >
-                      {formatTime(label.start)}–{formatTime(label.end)}
-                    </th>
-                    {days.map(({ day, slots }) => (
-                      <td key={day} className="px-1.5 py-1.5 align-top">
-                        {slots[i] && cell(day, slots[i])}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
+        <div className="space-y-8">{weeks.map(weekSection)}</div>
       )}
     </div>
   );
