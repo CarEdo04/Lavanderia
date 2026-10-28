@@ -2,25 +2,29 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// Supabase Postgres: DATABASE_URL goes through the connection pooler,
+// DIRECT_URL connects directly and is used for migrations.
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
+// Login, password and email confirmation live in Supabase Auth; this is the
+// resident profile linked to it by authId.
 model User {
-  id                 Int       @id @default(autoincrement())
-  firstName          String
-  lastName           String
-  email              String    @unique
-  emailVerifiedAt    DateTime?
-  verificationSentAt DateTime?
-  username           String?   @unique // optional, lowercase, can be used to log in
-  passwordHash       String
-  room               String?
-  rulesAcceptedAt    DateTime?
-  role               String    @default("USER") // USER | ADMIN
-  createdAt          DateTime  @default(now()) // registration date
-  bookings           Booking[]
+  id              Int       @id @default(autoincrement())
+  authId          String    @unique // Supabase Auth user id
+  firstName       String
+  lastName        String
+  email           String    @unique
+  emailVerifiedAt DateTime? // copied from Supabase Auth when the email is confirmed
+  username        String?   @unique // optional, lowercase, can be used to log in
+  room            String?
+  rulesAcceptedAt DateTime?
+  role            String    @default("USER") // USER | ADMIN
+  createdAt       DateTime  @default(now()) // registration date
+  bookings        Booking[]
 }
 
 model Machine {

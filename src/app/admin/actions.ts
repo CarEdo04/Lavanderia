@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { MACHINE_TYPES, NOTICE_LEVELS } from "@/lib/messages";
 import { DEFAULT_RULES } from "@/lib/rules";
 import { requireAdmin } from "@/lib/session";
+import { supabaseAdmin } from "@/lib/supabase";
 import { addDays, isValidDay } from "@/lib/time";
 
 const done = (esito = "salvato"): never => redirect(`/admin?esito=${esito}`);
@@ -141,8 +142,15 @@ export async function deleteNotice(formData: FormData) {
 export async function markVerified(formData: FormData) {
   await requireAdmin();
   const id = int(formData, "id", 1, Number.MAX_SAFE_INTEGER);
-  if (id === null) return done("dati-non-validi");
-  await prisma.user.updateMany({ where: { id, emailVerifiedAt: null }, data: { emailVerifiedAt: new Date() } });
+  const user = id === null ? null : await prisma.user.findUnique({ where: { id } });
+  if (!user) return done("dati-non-validi");
+  // Supabase must know too, otherwise it keeps refusing the login.
+  const { error } = await supabaseAdmin().auth.admin.updateUserById(user.authId, { email_confirm: true });
+  if (error) {
+    console.error("Conferma email non riuscita", error);
+    return done("operazione-fallita");
+  }
+  await prisma.user.updateMany({ where: { id: user.id, emailVerifiedAt: null }, data: { emailVerifiedAt: new Date() } });
   done();
 }
 

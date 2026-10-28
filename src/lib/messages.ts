@@ -20,7 +20,9 @@ export const ESITI: Record<string, { ok: boolean; text: string }> = {
   "email-inviata": { ok: true, text: "Ti abbiamo inviato una nuova email di conferma." },
   attendi: { ok: false, text: "Hai appena ricevuto un'email: attendi un minuto prima di chiederne un'altra." },
   "invio-fallito": { ok: false, text: "Non è stato possibile inviare l'email. Riprova più tardi o contatta l'amministratore." },
-  "link-non-valido": { ok: false, text: "Il link di conferma non è valido o è scaduto. Accedi e chiedine uno nuovo." },
+  "link-non-valido": { ok: false, text: "Il link non è valido, è scaduto o è già stato usato. Accedi, oppure chiedine uno nuovo." },
+  "password-aggiornata": { ok: true, text: "Password aggiornata." },
+  "operazione-fallita": { ok: false, text: "Operazione non riuscita. Riprova più tardi." },
 };
 
 export const MACHINE_TYPES: Record<string, string> = {

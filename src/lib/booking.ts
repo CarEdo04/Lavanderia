@@ -41,22 +41,32 @@ export async function createBooking(userId: number, machineId: number, start: Da
   if (isTooLate(slot, settings, now)) return "troppo-tardi";
   if (day > addDays(today(), settings.maxDaysAhead - 1)) return "troppo-avanti";
 
-  try {
-    return await prisma.$transaction(async (tx): Promise<BookingResult> => {
-      const active = await tx.booking.count({ where: { userId, end: { gt: now } } });
-      if (active >= settings.maxActiveBookings) return "limite";
+  // Serializable, so two requests from the same person at the same moment
+  // cannot both pass the active-bookings limit. Postgres aborts one of them
+  // (P2034) and it is retried against the committed state.
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await prisma.$transaction(
+        async (tx): Promise<BookingResult> => {
+          const active = await tx.booking.count({ where: { userId, end: { gt: now } } });
+          if (active >= settings.maxActiveBookings) return "limite";
 
-      const clash = await tx.booking.findFirst({
-        where: { machineId, start: { lt: slot.end }, end: { gt: slot.start } },
-      });
-      if (clash) return "occupato";
+          const clash = await tx.booking.findFirst({
+            where: { machineId, start: { lt: slot.end }, end: { gt: slot.start } },
+          });
+          if (clash) return "occupato";
 
-      await tx.booking.create({ data: { machineId, userId, start: slot.start, end: slot.end } });
-      return "prenotata";
-    });
-  } catch (e) {
-    // Unique (machineId, start) caught a booking made at the same moment.
-    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") return "occupato";
-    throw e;
+          await tx.booking.create({ data: { machineId, userId, start: slot.start, end: slot.end } });
+          return "prenotata";
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (e) {
+      if (!(e instanceof Prisma.PrismaClientKnownRequestError)) throw e;
+      // Unique (machineId, start) caught a booking made at the same moment.
+      if (e.code === "P2002") return "occupato";
+      if (e.code === "P2034" && attempt < 3) continue;
+      throw e;
+    }
   }
 }

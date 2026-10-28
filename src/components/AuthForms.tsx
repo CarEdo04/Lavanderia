@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useActionState } from "react";
-import { login, register, type FormState } from "@/app/actions";
+import { login, register, requestPasswordReset, updatePassword, type FormState } from "@/app/actions";
 import { SubmitButton } from "./SubmitButton";
 
 const input =
@@ -16,6 +16,15 @@ function FormError({ state }: { state: FormState }) {
   return (
     <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
       {state.error}
+    </p>
+  );
+}
+
+function FormNotice({ state }: { state: FormState }) {
+  if (!state?.notice) return null;
+  return (
+    <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+      {state.notice}
     </p>
   );
 }
@@ -40,6 +49,11 @@ export function LoginForm() {
         Password
         <input name="password" type="password" autoComplete="current-password" required className={input} />
       </label>
+      <p className="-mt-2 text-right text-sm">
+        <Link href="/password-dimenticata" className="text-sky-700 hover:underline">
+          Password dimenticata?
+        </Link>
+      </p>
       <SubmitButton className={button}>Accedi</SubmitButton>
       <p className="text-center text-sm text-slate-600">
         Non hai un account?{" "}
@@ -118,6 +132,51 @@ export function RegisterForm({ needsCode, rules }: { needsCode: boolean; rules: 
           Accedi
         </Link>
       </p>
+    </form>
+  );
+}
+
+export function ResetRequestForm() {
+  const [state, action] = useActionState(requestPasswordReset, undefined);
+  return (
+    <form action={action} className="space-y-4">
+      <FormError state={state} />
+      <FormNotice state={state} />
+      <label className={label}>
+        Email o username
+        <input
+          name="identifier"
+          autoComplete="username"
+          autoCapitalize="none"
+          required
+          defaultValue={state?.values?.identifier}
+          className={input}
+        />
+      </label>
+      <SubmitButton className={button}>Invia il link</SubmitButton>
+      <p className="text-center text-sm text-slate-600">
+        <Link href="/login" className="font-medium text-sky-700 hover:underline">
+          Torna all&apos;accesso
+        </Link>
+      </p>
+    </form>
+  );
+}
+
+export function NewPasswordForm() {
+  const [state, action] = useActionState(updatePassword, undefined);
+  return (
+    <form action={action} className="space-y-4">
+      <FormError state={state} />
+      <label className={label}>
+        Nuova password <span className={hint}>(almeno 8 caratteri)</span>
+        <input name="password" type="password" autoComplete="new-password" required minLength={8} className={input} />
+      </label>
+      <label className={label}>
+        Ripeti la nuova password
+        <input name="confirm" type="password" autoComplete="new-password" required minLength={8} className={input} />
+      </label>
+      <SubmitButton className={button}>Salva la password</SubmitButton>
     </form>
   );
 }
