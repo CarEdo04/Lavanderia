@@ -129,7 +129,8 @@ export default async function BookPage({
           <div
             id={cardId}
             popover="auto"
-            className="w-72 max-w-[calc(100vw-2rem)] rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-xl backdrop:bg-slate-900/20"
+            // m-auto + fixed inset-0 centre it; Tailwind's reset removes the browser's own centring.
+            className="fixed inset-0 m-auto h-fit w-72 max-w-[calc(100vw-2rem)] rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-xl backdrop:bg-slate-900/20"
           >
             <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
               {formatDay(day, { weekday: "long", day: "numeric", month: "long" })} · {formatTime(slot.start)}–
