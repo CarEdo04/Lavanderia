@@ -67,7 +67,7 @@ export default async function BookPage({
     machine
       ? prisma.booking.findMany({
           where: { machineId: machine.id, start: { lt: rangeEnd }, end: { gt: rangeStart } },
-          include: { user: { select: { firstName: true, lastName: true, room: true } } },
+          include: { user: { select: { firstName: true, lastName: true, username: true, email: true, room: true } } },
         })
       : [],
     prisma.booking.count({ where: { userId: user.id, end: { gt: now } } }),
@@ -84,7 +84,7 @@ export default async function BookPage({
     return notices.filter((n) => n.startDay <= addDays(monday, 6) && n.endDay >= from);
   };
 
-  function cell(week: string, day: string, slot: Slot) {
+  function cell(week: string, day: string, slot: Slot, view: "phone" | "grid") {
     const b = bookings.find((b) => b.start < slot.end && b.end > slot.start);
     const past = slot.end <= now;
 
@@ -114,19 +114,42 @@ export default async function BookPage({
       );
     }
     if (b) {
+      // Each booking is drawn twice (phone and wide layouts), hence the view in the id.
+      const cardId = `prenotazione-${b.id}-${view}`;
       return (
-        <div className="flex min-h-11 flex-col justify-center rounded-md bg-slate-100 px-2 py-1.5 text-slate-600">
-          {isAdmin ? (
-            <>
-              <span className="truncate font-medium text-slate-800" title={fullName(b.user)}>
-                {fullName(b.user)}
-              </span>
-              {b.user.room && <span className="text-xs">stanza {b.user.room}</span>}
-            </>
-          ) : (
-            "Occupato"
-          )}
-        </div>
+        <>
+          <button
+            type="button"
+            popoverTarget={cardId}
+            title="Chi ha prenotato"
+            className="flex min-h-11 w-full items-center rounded-md bg-slate-100 px-2 py-1.5 text-left text-slate-700 hover:bg-slate-200"
+          >
+            <span className="truncate font-medium">{b.user.username ?? fullName(b.user)}</span>
+          </button>
+          <div
+            id={cardId}
+            popover="auto"
+            className="w-72 max-w-[calc(100vw-2rem)] rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-xl backdrop:bg-slate-900/20"
+          >
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+              {formatDay(day, { weekday: "long", day: "numeric", month: "long" })} · {formatTime(slot.start)}–
+              {formatTime(slot.end)}
+            </p>
+            <p className="text-base font-semibold text-slate-900">{fullName(b.user)}</p>
+            <a href={`mailto:${b.user.email}`} className="break-all text-sky-700 hover:underline">
+              {b.user.email}
+            </a>
+            {isAdmin && b.user.room && <p className="mt-1 text-slate-600">Stanza {b.user.room}</p>}
+            <button
+              type="button"
+              popoverTarget={cardId}
+              popoverTargetAction="hide"
+              className="mt-3 w-full rounded-md border border-slate-300 px-3 py-1.5 text-slate-700 hover:bg-slate-50"
+            >
+              Chiudi
+            </button>
+          </div>
+        </>
       );
     }
     if (past || day > lastDay) {
@@ -200,7 +223,7 @@ export default async function BookPage({
                       <span className="w-24 shrink-0 tabular-nums text-slate-600">
                         {formatTime(slot.start)}–{formatTime(slot.end)}
                       </span>
-                      <div className="min-w-0 flex-1">{cell(monday, day, slot)}</div>
+                      <div className="min-w-0 flex-1">{cell(monday, day, slot, "phone")}</div>
                     </li>
                   ))}
                 </ul>
@@ -246,7 +269,7 @@ export default async function BookPage({
                   </th>
                   {days.map(({ day, slots }) => (
                     <td key={day} className="px-1.5 py-1.5 align-top">
-                      {slots[i] && cell(monday, day, slots[i])}
+                      {slots[i] && cell(monday, day, slots[i], "grid")}
                     </td>
                   ))}
                 </tr>
