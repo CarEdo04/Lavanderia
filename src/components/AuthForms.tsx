@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { login, register, requestPasswordReset, updatePassword, type FormState } from "@/app/actions";
+import { baseUsername } from "@/lib/people";
 import { SubmitButton } from "./SubmitButton";
 
 const input =
@@ -68,36 +69,48 @@ export function LoginForm() {
 export function RegisterForm({ needsCode, rules }: { needsCode: boolean; rules: string }) {
   const [state, action] = useActionState(register, undefined);
   const v = state?.values;
+  // Typed names, for the username preview below them.
+  const [names, setNames] = useState({ firstName: v?.firstName ?? "", lastName: v?.lastName ?? "" });
+  const typed = names.firstName.trim() && names.lastName.trim();
   return (
     <form action={action} className="space-y-4">
       <FormError state={state} />
-      <div className="grid grid-cols-2 gap-3">
-        <label className={label}>
-          Nome
-          <input name="firstName" autoComplete="given-name" required maxLength={40} defaultValue={v?.firstName} className={input} />
-        </label>
-        <label className={label}>
-          Cognome
-          <input name="lastName" autoComplete="family-name" required maxLength={40} defaultValue={v?.lastName} className={input} />
-        </label>
+      <div>
+        <div className="grid grid-cols-2 gap-3">
+          <label className={label}>
+            Nome
+            <input
+              name="firstName"
+              autoComplete="given-name"
+              required
+              maxLength={40}
+              defaultValue={v?.firstName}
+              onChange={(e) => setNames({ ...names, firstName: e.target.value })}
+              className={input}
+            />
+          </label>
+          <label className={label}>
+            Cognome
+            <input
+              name="lastName"
+              autoComplete="family-name"
+              required
+              maxLength={40}
+              defaultValue={v?.lastName}
+              onChange={(e) => setNames({ ...names, lastName: e.target.value })}
+              className={input}
+            />
+          </label>
+        </div>
+        <p className="mt-1.5 text-sm text-slate-500" aria-live="polite">
+          Username per accedere:{" "}
+          {typed ? <strong className="font-medium text-slate-800">{baseUsername(names)}</strong> : "cognome.nome"}
+          {typed && " (con un numero in più se è già usato)"}
+        </p>
       </div>
       <label className={label}>
         Email <span className={hint}>(riceverai un link di conferma)</span>
         <input name="email" type="email" autoComplete="email" required defaultValue={v?.email} className={input} />
-      </label>
-      <label className={label}>
-        Username <span className={hint}>(facoltativo, per accedere senza email)</span>
-        <input
-          name="username"
-          autoComplete="username"
-          autoCapitalize="none"
-          minLength={3}
-          maxLength={30}
-          pattern="[A-Za-z0-9._\-]{3,30}"
-          title="3–30 caratteri tra lettere, numeri, punto, trattino e trattino basso"
-          defaultValue={v?.username}
-          className={input}
-        />
       </label>
       <label className={label}>
         Password <span className={hint}>(almeno 8 caratteri)</span>

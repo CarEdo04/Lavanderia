@@ -29,7 +29,16 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: P
 
   return (
     <div className="max-w-2xl">
-      <h1 className="mb-4 text-2xl font-semibold text-slate-900">Le mie prenotazioni</h1>
+      <h1 className="text-2xl font-semibold text-slate-900">Le mie prenotazioni</h1>
+      <p className="mb-4 text-sm text-slate-600">
+        Accedi con la tua email{user.username && (
+          <>
+            {" "}
+            o con lo username <strong className="font-medium text-slate-800">{user.username}</strong>
+          </>
+        )}
+        .
+      </p>
       <Flash code={esito} />
 
       {upcoming.length === 0 ? (

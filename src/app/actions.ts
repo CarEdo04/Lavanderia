@@ -13,6 +13,7 @@ import {
   requireVerifiedUser,
 } from "@/lib/session";
 import { appUrl, supabaseAdmin, supabaseServer } from "@/lib/supabase";
+import { availableUsername } from "@/lib/usernames";
 import { isValidDay } from "@/lib/time";
 
 // `values` echoes the submitted fields (never the password) so the form can
@@ -20,14 +21,14 @@ import { isValidDay } from "@/lib/time";
 export type FormState = { error?: string; notice?: string; values?: Record<string, string> } | undefined;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const USERNAME_RE = /^[a-z0-9._-]{3,30}$/;
 const ROOM_RE = /^[A-Za-z0-9 /-]{1,10}$/;
 const MIN_PASSWORD = 8;
+const TOO_MANY_EMAILS = "Sono state inviate troppe email in poco tempo. Riprova più tardi (può volerci fino a un'ora); se il problema continua, contatta l'amministratore.";
 
 // Where the links in Supabase's emails land (see src/app/auth/conferma).
 const confirmUrl = (next?: string) => `${appUrl()}/auth/conferma${next ? `?next=${encodeURIComponent(next)}` : ""}`;
 
-// Accepts either the email address or the optional username.
+// Accepts either the email address or the username (surname.name).
 async function emailFor(identifier: string) {
   if (identifier.includes("@")) return identifier;
   const user = await prisma.user.findUnique({ where: { username: identifier }, select: { email: true } });
@@ -68,7 +69,6 @@ export async function register(_: FormState, formData: FormData): Promise<FormSt
     firstName: String(formData.get("firstName") ?? "").trim(),
     lastName: String(formData.get("lastName") ?? "").trim(),
     email: String(formData.get("email") ?? "").trim().toLowerCase(),
-    username: String(formData.get("username") ?? "").trim().toLowerCase(),
     room: String(formData.get("room") ?? "").trim(),
   };
   const password = String(formData.get("password") ?? "");
@@ -80,9 +80,6 @@ export async function register(_: FormState, formData: FormData): Promise<FormSt
   if (values.firstName.length < 1 || values.firstName.length > 40) return fail("Inserisci il tuo nome.");
   if (values.lastName.length < 1 || values.lastName.length > 40) return fail("Inserisci il tuo cognome.");
   if (!EMAIL_RE.test(values.email)) return fail("Inserisci un indirizzo email valido.");
-  if (values.username && !USERNAME_RE.test(values.username)) {
-    return fail("Lo username deve avere 3–30 caratteri tra lettere, numeri, punto, trattino e trattino basso.");
-  }
   if (password.length < MIN_PASSWORD) return fail(`La password deve avere almeno ${MIN_PASSWORD} caratteri.`);
   if (!ROOM_RE.test(values.room)) return fail("Inserisci il numero della tua stanza.");
   if (!acceptedRules) return fail("Per registrarti devi accettare il regolamento.");
@@ -92,9 +89,6 @@ export async function register(_: FormState, formData: FormData): Promise<FormSt
     return fail("Codice di registrazione non corretto. Chiedilo all'amministratore.");
   }
   if (await prisma.user.findUnique({ where: { email: values.email } })) return fail(taken);
-  if (values.username && (await prisma.user.findUnique({ where: { username: values.username } }))) {
-    return fail("Questo username è già in uso.");
-  }
 
   // Supabase stores the password and sends the confirmation email.
   const supabase = await supabaseServer();
@@ -105,8 +99,19 @@ export async function register(_: FormState, formData: FormData): Promise<FormSt
   });
   if (error?.code === "weak_password") return fail("Password troppo debole: scegline una più lunga o meno comune.");
   if (error?.code === "user_already_exists" || error?.code === "email_exists") return fail(taken);
-  if (error?.code === "over_email_send_rate_limit") {
-    return fail("Troppe email inviate di recente. Riprova tra qualche minuto.");
+  // Supabase limits emails per address and per project (very low with its
+  // built-in email service), so the wait can last up to an hour.
+  if (error?.code === "over_email_send_rate_limit" || error?.status === 429) return fail(TOO_MANY_EMAILS);
+  // Supabase refuses addresses it considers undeliverable, and its built-in
+  // email service only sends to the project's team until custom SMTP is set.
+  if (error?.code === "email_address_invalid") {
+    return fail("Questo indirizzo email non è accettato. Usa un indirizzo reale a cui puoi ricevere posta.");
+  }
+  if (error?.code === "email_address_not_authorized") {
+    return fail("Per ora non possiamo inviare email a questo indirizzo. Contatta l'amministratore.");
+  }
+  if (error?.code === "signup_disabled" || error?.code === "email_provider_disabled") {
+    return fail("Le registrazioni sono chiuse al momento. Contatta l'amministratore.");
   }
   if (error) {
     console.error("Registrazione non riuscita", error);
@@ -116,26 +121,31 @@ export async function register(_: FormState, formData: FormData): Promise<FormSt
   // user that has no identities instead of an error.
   if (!data.user || data.user.identities?.length === 0) return fail(taken);
 
-  try {
-    await prisma.user.create({
-      data: {
-        authId: data.user.id,
-        firstName: values.firstName,
-        lastName: values.lastName,
-        email: values.email,
-        username: values.username || null,
-        room: values.room,
-        rulesAcceptedAt: new Date(),
-        emailVerifiedAt: data.user.email_confirmed_at ? new Date(data.user.email_confirmed_at) : null,
-      },
-    });
-  } catch (e) {
-    // Someone took the email or username a moment ago: undo the Auth account.
-    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+  // The username is always surname.name (plus a number for homonyms). If a
+  // homonym registers at the same moment, pick the next free one.
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await prisma.user.create({
+        data: {
+          authId: data.user.id,
+          firstName: values.firstName,
+          lastName: values.lastName,
+          email: values.email,
+          username: await availableUsername(prisma, values),
+          room: values.room,
+          rulesAcceptedAt: new Date(),
+          emailVerifiedAt: data.user.email_confirmed_at ? new Date(data.user.email_confirmed_at) : null,
+        },
+      });
+      break;
+    } catch (e) {
+      if (!(e instanceof Prisma.PrismaClientKnownRequestError) || e.code !== "P2002") throw e;
+      const target = String(e.meta?.target ?? "");
+      if (target.includes("username") && attempt < 3) continue;
+      // Someone registered this email a moment ago: undo the Auth account.
       await supabaseAdmin().auth.admin.deleteUser(data.user.id);
-      return fail("Email o username già in uso.");
+      return fail(taken);
     }
-    throw e;
   }
 
   // No session means Supabase is waiting for the email to be confirmed.
@@ -175,7 +185,7 @@ export async function requestPasswordReset(_: FormState, formData: FormData): Pr
     const supabase = await supabaseServer();
     const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: confirmUrl("/nuova-password") });
     if (error?.code === "over_email_send_rate_limit" || error?.status === 429) {
-      return { error: "Hai appena chiesto un link: attendi un minuto prima di chiederne un altro.", values: { identifier } };
+      return { error: TOO_MANY_EMAILS, values: { identifier } };
     }
     if (error) console.error("Invio email di recupero non riuscito", error);
   }

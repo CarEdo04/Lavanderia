@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { createClient } from "@supabase/supabase-js";
+import { availableUsername } from "../src/lib/usernames";
 
 try {
   process.loadEnvFile();
@@ -39,14 +40,15 @@ async function main() {
   const email = (process.env.ADMIN_EMAIL ?? "admin@lavanderia.test").toLowerCase();
   const authId = await adminAuthId(email, env("ADMIN_PASSWORD"));
 
+  const names = { firstName: "Amministratore", lastName: "" };
   await prisma.user.upsert({
     where: { email },
     update: { authId },
     create: {
       authId,
       email,
-      firstName: "Amministratore",
-      lastName: "",
+      ...names,
+      username: await availableUsername(prisma, names),
       emailVerifiedAt: new Date(),
       role: "ADMIN",
     },

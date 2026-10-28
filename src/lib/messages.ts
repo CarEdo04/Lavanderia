@@ -18,7 +18,7 @@ export const ESITI: Record<string, { ok: boolean; text: string }> = {
   "se-stesso": { ok: false, text: "Non puoi cambiare il tuo ruolo." },
   "email-verificata": { ok: true, text: "Email confermata. Ora puoi prenotare." },
   "email-inviata": { ok: true, text: "Ti abbiamo inviato una nuova email di conferma." },
-  attendi: { ok: false, text: "Hai appena ricevuto un'email: attendi un minuto prima di chiederne un'altra." },
+  attendi: { ok: false, text: "Sono state inviate troppe email in poco tempo. Riprova più tardi (può volerci fino a un'ora); se il problema continua, contatta l'amministratore." },
   "invio-fallito": { ok: false, text: "Non è stato possibile inviare l'email. Riprova più tardi o contatta l'amministratore." },
   "link-non-valido": { ok: false, text: "Il link non è valido, è scaduto o è già stato usato. Accedi, oppure chiedine uno nuovo." },
   "password-aggiornata": { ok: true, text: "Password aggiornata." },

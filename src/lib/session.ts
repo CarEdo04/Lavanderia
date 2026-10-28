@@ -30,6 +30,7 @@ export type CurrentUser = {
   id: number;
   authId: string;
   email: string;
+  username: string | null;
   firstName: string;
   lastName: string;
   room: string | null;
@@ -50,6 +51,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
       id: true,
       authId: true,
       email: true,
+      username: true,
       firstName: true,
       lastName: true,
       room: true,

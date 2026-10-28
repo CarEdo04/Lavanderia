@@ -4,11 +4,11 @@ A booking app for a shared laundry room in an apartment building or dorm. It wor
 
 ## Features
 
-- **Registration** asks for first name, surname, email, an optional username, password and room number, and the resident must accept the laundry rules. The registration date and the time the rules were accepted are stored.
+- **Registration** asks for first name, surname, email, password and room number, and the resident must accept the laundry rules. The registration date and the time the rules were accepted are stored.
 - **Accounts live in Supabase Auth**, which stores the passwords and sends the emails:
   - after signing up, residents get a confirmation link and can only book once they've opened it; they can ask for a new one from the "check your email" page
   - *Password dimenticata?* on the login page sends a link to choose a new password
-  - login works with either the email address or the username
+  - login works with either the email address or the username, which is always `surname.name` (lowercase, without accents, spaces or apostrophes; homonyms get a number, e.g. `rossi.mario2`)
   - the resident profile (name, room, role, rules acceptance) is stored in the app's own `User` table, linked by `authId`
 - **Residents** book a free shift from a week grid (days × shifts, like a paper booking sheet). On phones the week shows as one card per day. By default there are four 4-hour shifts, Monday to Saturday. They can cancel their own upcoming bookings from the grid or from *Le mie prenotazioni*.
 - **Booking rules** are enforced on the server:
