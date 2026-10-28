@@ -23,7 +23,6 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: P
       where: { userId: user.id, end: { lte: now } },
       include: { machine: true },
       orderBy: { start: "desc" },
-      take: 10,
     }),
   ]);
 
@@ -61,16 +60,19 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: P
                   {b.start <= now && <span className="ml-2 font-medium text-emerald-700">in corso</span>}
                 </div>
               </div>
-              <form action={cancel}>
-                <input type="hidden" name="bookingId" value={b.id} />
-                <input type="hidden" name="back" value="mie" />
-                <SubmitButton
-                  confirm="Vuoi annullare questa prenotazione?"
-                  className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:border-red-300 hover:text-red-700"
-                >
-                  Annulla
-                </SubmitButton>
-              </form>
+              {/* A shift that has started stays in the history. */}
+              {b.start > now && (
+                <form action={cancel}>
+                  <input type="hidden" name="bookingId" value={b.id} />
+                  <input type="hidden" name="back" value="mie" />
+                  <SubmitButton
+                    confirm="Vuoi annullare questa prenotazione?"
+                    className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:border-red-300 hover:text-red-700"
+                  >
+                    Annulla
+                  </SubmitButton>
+                </form>
+              )}
             </li>
           ))}
         </ul>
@@ -78,7 +80,9 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: P
 
       {past.length > 0 && (
         <>
-          <h2 className="mb-2 mt-8 text-sm font-semibold uppercase tracking-wide text-slate-500">Storico recente</h2>
+          <h2 className="mb-2 mt-8 text-sm font-semibold uppercase tracking-wide text-slate-500">
+            Storico ({past.length} {past.length === 1 ? "turno" : "turni"})
+          </h2>
           <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white text-sm text-slate-500">
             {past.map((b) => (
               <li key={b.id} className="px-4 py-2">

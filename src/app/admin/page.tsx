@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { cancel } from "../actions";
 import {
   addMachine,
@@ -53,7 +54,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     getSettings(),
     prisma.machine.findMany({
       orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
-      include: { _count: { select: { bookings: { where: { end: { gt: now } } } } } },
+      include: { _count: { select: { bookings: true } } },
     }),
     prisma.booking.findMany({
       where: { end: { gt: now } },
@@ -220,15 +221,17 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                 <input type="hidden" name="id" value={m.id} />
                 <SubmitButton className={secondary}>{m.active ? "Disattiva" : "Riattiva"}</SubmitButton>
               </form>
-              <form action={deleteMachine}>
-                <input type="hidden" name="id" value={m.id} />
-                <SubmitButton
-                  className={danger}
-                  confirm={`Eliminare "${m.name}"? Verranno cancellate anche tutte le sue prenotazioni (${m._count.bookings} future).`}
-                >
-                  Elimina
-                </SubmitButton>
-              </form>
+              {/* Machines with bookings stay, so their history is kept: they can only be disabled. */}
+              {m._count.bookings === 0 ? (
+                <form action={deleteMachine}>
+                  <input type="hidden" name="id" value={m.id} />
+                  <SubmitButton className={danger} confirm={`Eliminare "${m.name}"?`}>
+                    Elimina
+                  </SubmitButton>
+                </form>
+              ) : (
+                <span className="text-xs text-slate-500">{m._count.bookings} prenotazioni nello storico</span>
+              )}
               {!m.active && <span className="rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-800">Fuori servizio</span>}
             </li>
           ))}
@@ -242,7 +245,12 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       </section>
 
       <section className={card}>
-        <h2 className={h2}>Prossime prenotazioni</h2>
+        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-lg font-semibold text-slate-900">Prossime prenotazioni</h2>
+          <Link href="/admin/storico" className="text-sm font-medium text-sky-700 hover:underline">
+            Storico delle prenotazioni ›
+          </Link>
+        </div>
         {bookings.length === 0 ? (
           <p className="text-sm text-slate-600">Nessuna prenotazione in programma.</p>
         ) : (
@@ -270,13 +278,17 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                       {b.user.room && <span className="text-slate-500"> (stanza {b.user.room})</span>}
                     </td>
                     <td className="py-2 text-right">
-                      <form action={cancel}>
-                        <input type="hidden" name="bookingId" value={b.id} />
-                        <input type="hidden" name="back" value="admin" />
-                        <SubmitButton className={danger} confirm={`Annullare la prenotazione di ${fullName(b.user)}?`}>
-                          Annulla
-                        </SubmitButton>
-                      </form>
+                      {b.start <= now ? (
+                        <span className="text-xs font-medium text-emerald-700">in corso</span>
+                      ) : (
+                        <form action={cancel}>
+                          <input type="hidden" name="bookingId" value={b.id} />
+                          <input type="hidden" name="back" value="admin" />
+                          <SubmitButton className={danger} confirm={`Annullare la prenotazione di ${fullName(b.user)}?`}>
+                            Annulla
+                          </SubmitButton>
+                        </form>
+                      )}
                     </td>
                   </tr>
                 ))}

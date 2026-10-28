@@ -251,7 +251,8 @@ export async function cancel(formData: FormData) {
 
   const booking = Number.isInteger(id) ? await prisma.booking.findUnique({ where: { id } }) : null;
   if (!booking || (booking.userId !== user.id && user.role !== "ADMIN")) return go("non-trovata");
-  if (booking.end <= new Date()) return go("gia-conclusa");
+  // Once a shift has started it stays in the history.
+  if (booking.start <= new Date()) return go("gia-iniziata");
 
   await prisma.booking.delete({ where: { id } });
   go("annullata");

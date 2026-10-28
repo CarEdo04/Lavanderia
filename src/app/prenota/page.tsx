@@ -87,6 +87,7 @@ export default async function BookPage({
   function cell(week: string, day: string, slot: Slot, view: "phone" | "grid") {
     const b = bookings.find((b) => b.start < slot.end && b.end > slot.start);
     const past = slot.end <= now;
+    const started = slot.start <= now;
 
     if (b && b.userId === user.id) {
       return (
@@ -95,7 +96,7 @@ export default async function BookPage({
           className="flex min-h-11 flex-wrap items-center justify-between gap-x-2 rounded-md bg-emerald-50 px-2 py-1.5 ring-1 ring-emerald-200"
         >
           <span className="font-medium text-emerald-800">Tuo turno</span>
-          {!past && (
+          {!started && (
             <>
               <input type="hidden" name="bookingId" value={b.id} />
               <input type="hidden" name="machineId" value={b.machineId} />

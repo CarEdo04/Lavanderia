@@ -13,7 +13,11 @@ export const ESITI: Record<string, { ok: boolean; text: string }> = {
   "turno-non-valido": { ok: false, text: "Orario non valido. Ricarica la pagina e riprova." },
   macchina: { ok: false, text: "Questa macchina non è disponibile." },
   "non-trovata": { ok: false, text: "Prenotazione non trovata." },
-  "gia-conclusa": { ok: false, text: "Non puoi annullare una prenotazione già conclusa." },
+  "gia-iniziata": { ok: false, text: "Non puoi annullare un turno già iniziato o concluso: resta nello storico." },
+  "macchina-con-storico": {
+    ok: false,
+    text: "Questa macchina ha prenotazioni registrate, quindi non si può eliminare: disattivala per toglierla dal calendario.",
+  },
   "dati-non-validi": { ok: false, text: "Dati non validi. Controlla i campi e riprova." },
   "se-stesso": { ok: false, text: "Non puoi cambiare il tuo ruolo." },
   "email-verificata": { ok: true, text: "Email confermata. Ora puoi prenotare." },

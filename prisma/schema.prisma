@@ -44,8 +44,10 @@ model Booking {
   start     DateTime
   end       DateTime
   createdAt DateTime @default(now())
-  machine   Machine  @relation(fields: [machineId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Restrict: bookings are the laundry's history, so a machine or user that
+  // has any can't be deleted (disable the machine instead).
+  machine   Machine  @relation(fields: [machineId], references: [id], onDelete: Restrict)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Restrict)
 
   @@unique([machineId, start])
   @@index([userId, end])

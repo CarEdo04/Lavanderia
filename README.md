@@ -18,10 +18,11 @@ A booking app for a shared laundry room in an apartment building or dorm. It wor
   - a minimum notice before a shift starts (72 hours by default)
   - no bookings in the past
   - only slots that match the current schedule
+- **Booking history is kept**: past shifts are never deleted. A shift can't be cancelled once it has started, and the database refuses to delete a machine or user that has bookings. Residents see their whole history in *Le mie prenotazioni*.
 - **Admins** (*Gestione* page) can:
   - set the slot length, opening hours, booking limits and an optional registration code
-  - add, rename, reorder, disable or delete machines
-  - see and cancel upcoming bookings
+  - add, rename, reorder, disable or delete machines (a machine with bookings can only be disabled)
+  - see and cancel upcoming bookings, and browse the full booking history month by month (*Storico delle prenotazioni*)
   - publish notices (information or problem) for a date range; they appear above the booking grid in the weeks they cover, until they end or are removed
   - edit the laundry rules shown at registration and on the *Regolamento* page
   - see every user's details, confirm an email by hand, and promote other users to admin

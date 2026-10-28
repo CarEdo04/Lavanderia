@@ -93,7 +93,10 @@ export async function deleteMachine(formData: FormData) {
   await requireAdmin();
   const id = int(formData, "id", 1, Number.MAX_SAFE_INTEGER);
   if (id === null) return done("dati-non-validi");
-  await prisma.machine.deleteMany({ where: { id } }); // bookings cascade
+  // A machine with bookings, past ones included, is part of the history:
+  // it can only be disabled. The database enforces this too.
+  if (await prisma.booking.count({ where: { machineId: id } })) return done("macchina-con-storico");
+  await prisma.machine.deleteMany({ where: { id } });
   done();
 }
 
