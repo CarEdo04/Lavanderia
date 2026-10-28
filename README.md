@@ -63,6 +63,27 @@ Log in with `ADMIN_EMAIL` / `ADMIN_PASSWORD` from `.env`. `npm run setup` create
 
 The tables have row level security turned on with no policies, so Supabase's public Data API can't read them. The app reaches the database only through Prisma.
 
+## Deploy on Vercel
+
+The database and logins already live in Supabase, so Vercel only runs the Next.js app. `vercel.json` runs it in Frankfurt (`fra1`), next to a Supabase project in `eu-central-1`; change the region if your project is elsewhere. `package.json` pins Node.js 24, which the Supabase client needs.
+
+1. On [vercel.com](https://vercel.com), sign up with **Continue with GitHub**, then **Add New → Project** and import this repository. Vercel detects Next.js; keep the default build settings.
+2. Before the first deploy, open **Environment Variables** and add:
+
+   | Variable | Value |
+   |---|---|
+   | `DATABASE_URL` | the **pooled** connection string (port **6543**, ending in `?pgbouncer=true&connection_limit=1`). Vercel opens many short-lived connections, which is what the pooler is for. |
+   | `DIRECT_URL` | the direct connection string (port 5432) |
+   | `SUPABASE_URL` (or `NEXT_PUBLIC_SUPABASE_URL`) | as in `.env` |
+   | `SUPABASE_PUBLISHABLE_KEY` (or `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`) | as in `.env` |
+   | `SUPABASE_SECRET_KEY` | as in `.env`. Keep it secret: it gives full access to the project. |
+   | `APP_URL` | the Vercel address, e.g. `https://lavanderia.vercel.app` (no trailing slash) |
+
+   `ADMIN_EMAIL` and `ADMIN_PASSWORD` are only used by `npm run setup` and aren't needed on Vercel.
+3. Deploy. Then, in Supabase, **Authentication → URL Configuration**: set *Site URL* to the Vercel address and add `https://<your-address>/**` to *Redirect URLs* (keep the localhost entries to keep testing locally). If `APP_URL` changes later, update it in Vercel and redeploy.
+
+Every push to `main` now redeploys the site, and pull requests get preview deployments. Database changes are not applied by the deploy: when a commit adds a migration, run `npx prisma migrate deploy` from your computer (it uses `DIRECT_URL`), preferably before pushing.
+
 ## Project layout
 
 ```
@@ -83,6 +104,6 @@ src/app/admin/              admin page and its actions
 ## Before putting it online
 
 - Configure custom SMTP in Supabase (see above), otherwise residents won't receive emails.
-- Set `APP_URL` and the Supabase *Site URL* to the public address, add it to the redirect URLs, and serve the app over HTTPS.
+- Set `APP_URL` and the Supabase *Site URL* to the public address and add it to the redirect URLs (see "Deploy on Vercel").
 - Set a registration code in *Gestione* so only residents can sign up.
 - Ideas for later: email reminders, recurring bookings, closed days, and a "machine broken" report button.
