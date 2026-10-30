@@ -14,6 +14,19 @@ export function isTooLate(slot: Slot, settings: { minHoursBefore: number }, now 
   return slot.start.getTime() - now.getTime() < settings.minHoursBefore * 3_600_000;
 }
 
+// Residents can cancel only while the shift could still be booked by someone
+// else; inside the notice window only an admin can. Nobody can cancel a shift
+// that has started, so it stays in the history.
+export function canCancel(
+  booking: Slot,
+  user: { role: string },
+  settings: { minHoursBefore: number },
+  now = new Date(),
+): boolean {
+  if (booking.start <= now) return false;
+  return user.role === "ADMIN" || !isTooLate(booking, settings, now);
+}
+
 export type BookingResult =
   | "prenotata"
   | "occupato"
@@ -24,7 +37,14 @@ export type BookingResult =
   | "turno-non-valido"
   | "macchina";
 
-export async function createBooking(userId: number, machineId: number, start: Date): Promise<BookingResult> {
+// `byAdmin` skips the notice window: admins can still fill a shift that
+// residents can no longer book.
+export async function createBooking(
+  userId: number,
+  machineId: number,
+  start: Date,
+  { byAdmin = false } = {},
+): Promise<BookingResult> {
   if (!Number.isInteger(machineId) || Number.isNaN(start.getTime())) return "turno-non-valido";
 
   const settings = await getSettings();
@@ -38,7 +58,7 @@ export async function createBooking(userId: number, machineId: number, start: Da
 
   const now = new Date();
   if (slot.end <= now) return "passato";
-  if (isTooLate(slot, settings, now)) return "troppo-tardi";
+  if (!byAdmin && isTooLate(slot, settings, now)) return "troppo-tardi";
   if (day > addDays(today(), settings.maxDaysAhead - 1)) return "troppo-avanti";
 
   // Serializable, so two requests from the same person at the same moment

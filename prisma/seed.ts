@@ -1,6 +1,6 @@
+import { randomBytes } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import { createClient } from "@supabase/supabase-js";
-import { availableUsername } from "../src/lib/usernames";
 
 try {
   process.loadEnvFile();
@@ -19,9 +19,21 @@ const supabase = createClient(env("SUPABASE_URL"), env("SUPABASE_SECRET_KEY"), {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
-// Creates the admin in Supabase Auth, or finds it when it already exists.
+const names = { firstName: "Amministratore", lastName: "" };
+
+// Creates the admin in Supabase Auth, or finds it when it already exists. Like
+// any sign-up, a new account needs a PendingSignup token: the database trigger
+// creates its User row from it.
 async function adminAuthId(email: string, password: string) {
-  const { data, error } = await supabase.auth.admin.createUser({ email, password, email_confirm: true });
+  const token = randomBytes(32).toString("hex");
+  await prisma.pendingSignup.create({ data: { token, email, ...names } });
+  const { data, error } = await supabase.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: { signup_token: token },
+  });
+  await prisma.pendingSignup.deleteMany({ where: { token } });
   if (data.user) return data.user.id;
   if (error?.code !== "email_exists") throw error;
 
@@ -40,19 +52,21 @@ async function main() {
   const email = (process.env.ADMIN_EMAIL ?? "admin@lavanderia.test").toLowerCase();
   const authId = await adminAuthId(email, env("ADMIN_PASSWORD"));
 
-  const names = { firstName: "Amministratore", lastName: "" };
-  await prisma.user.upsert({
-    where: { email },
-    update: { authId },
-    create: {
-      authId,
-      email,
-      ...names,
-      username: await availableUsername(prisma, names),
-      emailVerifiedAt: new Date(),
-      role: "ADMIN",
-    },
-  });
+  // The trigger made a plain profile for a new account; an account that
+  // already existed may have none yet.
+  const profile = await prisma.user.findUnique({ where: { email } });
+  if (profile) {
+    await prisma.user.update({
+      where: { id: profile.id },
+      data: { authId, role: "ADMIN", emailVerifiedAt: profile.emailVerifiedAt ?? new Date() },
+    });
+  } else {
+    const [{ username }] = await prisma.$queryRaw<{ username: string }[]>`
+      SELECT private.available_username(${names.firstName}, ${names.lastName}) AS username`;
+    await prisma.user.create({
+      data: { authId, email, ...names, username, emailVerifiedAt: new Date(), role: "ADMIN" },
+    });
+  }
 
   if ((await prisma.machine.count()) === 0) {
     await prisma.machine.create({ data: { name: "Lavanderia", type: "WASHER", sortOrder: 1 } });

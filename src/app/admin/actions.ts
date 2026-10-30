@@ -1,5 +1,6 @@
 "use server";
 
+import { randomInt } from "node:crypto";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { MACHINE_TYPES, NOTICE_LEVELS } from "@/lib/messages";
@@ -53,6 +54,18 @@ export async function saveSettings(formData: FormData) {
   };
   await prisma.settings.upsert({ where: { id: 1 }, update: data, create: { id: 1, ...data } });
   done();
+}
+
+// 8 random characters without look-alikes (0/O, 1/I/L), e.g. "K7QM-3XPA":
+// about 39 bits, far beyond what the rate limit lets anyone try.
+const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+
+export async function generateRegistrationCode() {
+  await requireAdmin();
+  const chars = Array.from({ length: 8 }, () => CODE_ALPHABET[randomInt(CODE_ALPHABET.length)]);
+  const registrationCode = `${chars.slice(0, 4).join("")}-${chars.slice(4).join("")}`;
+  await prisma.settings.upsert({ where: { id: 1 }, update: { registrationCode }, create: { id: 1, registrationCode } });
+  done("codice-generato");
 }
 
 function machineFields(formData: FormData) {

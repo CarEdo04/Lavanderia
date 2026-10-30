@@ -1,14 +1,17 @@
 import Link from "next/link";
 import { cancel } from "../actions";
+import { CancelLocked } from "@/components/CancelLocked";
 import { Flash } from "@/components/Flash";
 import { PlusIcon } from "@/components/Icons";
 import { SubmitButton } from "@/components/SubmitButton";
-import { getSettings } from "@/lib/booking";
+import { canCancel, getSettings } from "@/lib/booking";
 import { prisma } from "@/lib/db";
 import { requireVerifiedUser } from "@/lib/session";
 import { dayOf, daysUntil, formatDay, formatTime } from "@/lib/time";
 
 export const metadata = { title: "I miei turni · Lavanderia" };
+
+const cancelClass = "h-11 rounded-xl border border-line px-3.5 text-sm font-medium hover:border-red-300 hover:text-red-700";
 
 export default async function MyBookingsPage({ searchParams }: { searchParams: Promise<{ esito?: string }> }) {
   const user = await requireVerifiedUser();
@@ -86,8 +89,10 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: P
                       )}
                     </p>
                   </div>
-                  {/* A shift that has started stays in the history. */}
-                  {b.start > now && (
+                  {/* A shift that has started stays in the history; inside the notice window only an admin can cancel. */}
+                  {b.start <= now ? null : !canCancel(b, user, settings, now) ? (
+                    <CancelLocked id={`annulla-${b.id}`} hours={settings.minHoursBefore} className={cancelClass} />
+                  ) : (
                     <form action={cancel}>
                       <input type="hidden" name="bookingId" value={b.id} />
                       <input type="hidden" name="back" value="mie" />
@@ -100,7 +105,7 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: P
                             {formatDay(day, { weekday: "long", day: "numeric", month: "long" })}, {formatTime(b.start)} – {formatTime(b.end)}. Il turno tornerà libero per gli altri.
                           </p>
                         }
-                        className="h-11 rounded-xl border border-line px-3.5 text-sm font-medium hover:border-red-300 hover:text-red-700"
+                        className={cancelClass}
                       >
                         Annulla
                       </SubmitButton>

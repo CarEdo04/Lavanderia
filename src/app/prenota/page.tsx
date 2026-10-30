@@ -1,12 +1,13 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { book, cancel } from "../actions";
+import { CancelLocked } from "@/components/CancelLocked";
 import { Flash } from "@/components/Flash";
 import { ClockIcon, LockIcon, PlusIcon, TicketIcon, UndoIcon, WasherIcon } from "@/components/Icons";
 import { Notices } from "@/components/Notices";
 import { ScrollHere } from "@/components/ScrollHere";
 import { SubmitButton } from "@/components/SubmitButton";
-import { getSettings, isTooLate } from "@/lib/booking";
+import { canCancel, getSettings, isTooLate } from "@/lib/booking";
 import { prisma } from "@/lib/db";
 import { fullName, initials } from "@/lib/people";
 import { requireVerifiedUser } from "@/lib/session";
@@ -82,11 +83,16 @@ export default async function BookPage({
   const rangeStart = localToUtc(mondayOf(first), 0);
   const rangeEnd = localToUtc(addDays(mondayOf(lastDay), 7), 0);
 
-  const [bookings, mine, notices] = await Promise.all([
+  const [bookings, mine, notices, residents] = await Promise.all([
     machine
       ? prisma.booking.findMany({
           where: { machineId: machine.id, start: { lt: rangeEnd }, end: { gt: rangeStart } },
-          include: { user: { select: { firstName: true, lastName: true, username: true, email: true, room: true } } },
+          // Residents only see who booked by name; the contact details are for admins.
+          include: {
+            user: {
+              select: { firstName: true, lastName: true, username: isAdmin, email: isAdmin, room: isAdmin },
+            },
+          },
         })
       : [],
     prisma.booking.findMany({
@@ -98,12 +104,24 @@ export default async function BookPage({
       where: { startDay: { lte: lastDay }, endDay: { gte: first } },
       orderBy: [{ level: "desc" }, { startDay: "asc" }, { id: "asc" }],
     }),
+    // Admins can book for someone else, picked from this list.
+    isAdmin
+      ? prisma.user.findMany({
+          where: { username: { not: null } },
+          select: { username: true, firstName: true, lastName: true, room: true },
+          orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+        })
+      : [],
   ]);
-  const atLimit = mine.length >= settings.maxActiveBookings;
+  // Admins can book for others, so their own limit doesn't grey out the grid.
+  const atLimit = !isAdmin && mine.length >= settings.maxActiveBookings;
   const next = mine[0];
+  const hours = settings.minHoursBefore;
 
+  // `late`: inside the notice window, where only admins can still book.
   function stateOf(day: string, slot: Slot) {
     const booking = bookings.find((b) => b.start < slot.end && b.end > slot.start);
+    const late = isTooLate(slot, settings, now);
     const kind: Kind = booking
       ? booking.userId === user.id
         ? "mine"
@@ -112,10 +130,10 @@ export default async function BookPage({
         ? "past"
         : day > lastDay
           ? "later"
-          : isTooLate(slot, settings, now)
+          : late && !isAdmin
             ? "closed"
             : "free";
-    return { kind, booking };
+    return { kind, booking, late };
   }
   const freeCount = (d: (typeof days)[number]) => d.slots.filter((s) => stateOf(d.day, s).kind === "free").length;
 
@@ -140,7 +158,7 @@ export default async function BookPage({
     return `/prenota?${query}`;
   };
 
-  function bookButton(day: string, slot: Slot, className: string, label: ReactNode) {
+  function bookButton(day: string, slot: Slot, late: boolean, className: string, label: ReactNode) {
     return (
       <form action={book}>
         <input type="hidden" name="machineId" value={machine!.id} />
@@ -159,7 +177,28 @@ export default async function BookPage({
                   {machine!.name} · turno da {formatDuration(settings.slotMinutes)}
                 </p>
               </div>
+              {isAdmin && (
+                <label className="mt-4 block text-sm font-semibold text-ink">
+                  Per chi <span className="font-normal text-ink-2">(username; vuoto = per te)</span>
+                  <input
+                    name="per"
+                    list="residenti"
+                    autoComplete="off"
+                    autoCapitalize="none"
+                    placeholder="cognome.nome"
+                    className="mt-1.5 block h-12 w-full rounded-xl border-[1.5px] border-line bg-white px-3.5 font-mono text-base font-normal text-ink focus:border-brand focus:outline-none"
+                  />
+                </label>
+              )}
               <ul className="mt-4 space-y-2.5 text-sm leading-snug text-ink-2">
+                {isAdmin && late && (
+                  <li className="flex gap-2.5">
+                    <LockIcon className="mt-px size-[18px] flex-none text-brand" />
+                    <span>
+                      Mancano meno di {hours} ore: i residenti non possono più prenotarlo né annullarlo, tu sì.
+                    </span>
+                  </li>
+                )}
                 <li className="flex gap-2.5">
                   <ClockIcon className="mt-px size-[18px] flex-none text-brand" />
                   <span>
@@ -167,20 +206,28 @@ export default async function BookPage({
                     il bucato non è finito.
                   </span>
                 </li>
-                <li className="flex gap-2.5">
-                  <TicketIcon className="mt-px size-[18px] flex-none text-brand" />
-                  <span>
-                    Dopo questa avrai{" "}
-                    <strong className="text-ink">
-                      {mine.length + 1} di {settings.maxActiveBookings}
-                    </strong>{" "}
-                    prenotazioni attive.
-                  </span>
-                </li>
-                <li className="flex gap-2.5">
-                  <UndoIcon className="mt-px size-[18px] flex-none text-brand" />
-                  <span>Puoi annullarla fino all&apos;inizio del turno.</span>
-                </li>
+                {!isAdmin && (
+                  <li className="flex gap-2.5">
+                    <TicketIcon className="mt-px size-[18px] flex-none text-brand" />
+                    <span>
+                      Dopo questa avrai{" "}
+                      <strong className="text-ink">
+                        {mine.length + 1} di {settings.maxActiveBookings}
+                      </strong>{" "}
+                      prenotazioni attive.
+                    </span>
+                  </li>
+                )}
+                {!isAdmin && (
+                  <li className="flex gap-2.5">
+                    <UndoIcon className="mt-px size-[18px] flex-none text-brand" />
+                    <span>
+                      {hours > 0
+                        ? `Puoi annullarla fino a ${hours} ore prima dell'inizio; dopo, solo l'amministratore può farlo.`
+                        : "Puoi annullarla fino all'inizio del turno."}
+                    </span>
+                  </li>
+                )}
               </ul>
             </>
           }
@@ -220,6 +267,22 @@ export default async function BookPage({
     );
   }
 
+  // "Annulla" while the user may still cancel, else the card that sends them to an admin.
+  // Each booking can be drawn more than once (phone, grid, next shift), hence the view in the id.
+  function cancelControl(
+    b: { id: number; start: Date; end: Date },
+    day: string,
+    view: "phone" | "grid" | "next",
+    className: string,
+    label: string,
+  ) {
+    return canCancel(b, user, settings, now) ? (
+      cancelButton(b, day, className, label)
+    ) : (
+      <CancelLocked id={`annulla-${b.id}-${view}`} hours={hours} className={className} label={label} />
+    );
+  }
+
   function booker(
     b: NonNullable<ReturnType<typeof stateOf>["booking"]>,
     day: string,
@@ -227,19 +290,36 @@ export default async function BookPage({
     view: "phone" | "grid",
     className: string,
   ) {
-    // Each booking can be drawn twice (phone and wide layouts), hence the view in the id.
+    // The full name: on one line on phones, first name over surname in the narrow grid cells.
+    const name =
+      view === "grid" ? (
+        <span className="flex min-w-0 flex-col leading-tight">
+          <span className="truncate font-medium">{b.user.firstName}</span>
+          <span className="truncate">{b.user.lastName}</span>
+        </span>
+      ) : (
+        <span className="truncate font-medium">{fullName(b.user)}</span>
+      );
+    // Residents only see the name.
+    if (!isAdmin) {
+      return (
+        <div className={className} title={fullName(b.user)}>
+          <span className="sr-only">Prenotato da </span>
+          {name}
+        </div>
+      );
+    }
+
     const cardId = `prenotazione-${b.id}-${view}`;
-    const name = b.user.username ?? fullName(b.user);
     return (
       <>
-        <button type="button" popoverTarget={cardId} title="Chi ha prenotato" className={className}>
-          <span
-            aria-hidden
-            className="grid size-8 flex-none place-items-center rounded-full bg-taken-strong text-xs font-bold text-ink"
-          >
-            {initials(b.user)}
-          </span>
-          <span className="truncate">{name}</span>
+        <button
+          type="button"
+          popoverTarget={cardId}
+          title="Dettagli della prenotazione"
+          className={`${className} hover:bg-taken-strong`}
+        >
+          {name}
         </button>
         <div
           id={cardId}
@@ -262,12 +342,19 @@ export default async function BookPage({
           <a href={`mailto:${b.user.email}`} className="mt-3 block font-medium break-all text-brand hover:underline">
             {b.user.email}
           </a>
-          {isAdmin && b.user.room && <p className="mt-1 text-ink-2">Stanza {b.user.room}</p>}
+          {b.user.room && <p className="mt-1 text-ink-2">Stanza {b.user.room}</p>}
+          {slot.start > now &&
+            cancelButton(
+              b,
+              day,
+              "mt-4 h-11 w-full rounded-xl border border-red-200 font-medium text-red-700 hover:bg-red-50",
+              "Annulla prenotazione",
+            )}
           <button
             type="button"
             popoverTarget={cardId}
             popoverTargetAction="hide"
-            className="mt-4 h-11 w-full rounded-xl border border-line font-medium hover:bg-ground"
+            className="mt-2 h-11 w-full rounded-xl border border-line font-medium hover:bg-ground"
           >
             Chiudi
           </button>
@@ -277,7 +364,7 @@ export default async function BookPage({
   }
 
   function phoneRow(day: string, slot: Slot) {
-    const { kind, booking: b } = stateOf(day, slot);
+    const { kind, booking: b, late } = stateOf(day, slot);
     const grey = kind === "closed" || kind === "past" || kind === "later";
     return (
       <li
@@ -287,13 +374,18 @@ export default async function BookPage({
         <div className="min-w-0 flex-1">
           <p className={`font-mono text-base font-medium ${grey ? "text-muted" : ""}`}>{timeRange(slot)}</p>
           <p className={`mt-0.5 text-[13px] font-semibold ${kind === "free" || kind === "mine" ? "text-brand" : "text-muted"}`}>
-            {kind === "mine" && slot.start <= now ? "Il tuo turno · in corso" : STATUS[kind]}
+            {kind === "mine" && slot.start <= now
+              ? "Il tuo turno · in corso"
+              : kind === "free" && late
+                ? "Libero · solo admin"
+                : STATUS[kind]}
           </p>
         </div>
         {kind === "free" &&
           bookButton(
             day,
             slot,
+            late,
             `inline-flex h-12 items-center gap-1.5 rounded-xl border-[1.5px] px-4 text-[15px] font-semibold ${
               atLimit ? "border-line text-muted" : "border-brand bg-white text-brand hover:bg-brand-soft"
             }`,
@@ -304,9 +396,10 @@ export default async function BookPage({
           )}
         {kind === "mine" &&
           slot.start > now &&
-          cancelButton(
+          cancelControl(
             b!,
             day,
+            "phone",
             "h-11 rounded-xl border border-brand-line bg-white px-3.5 text-sm font-medium text-ink hover:border-red-300 hover:text-red-700",
             "Annulla",
           )}
@@ -316,7 +409,7 @@ export default async function BookPage({
             day,
             slot,
             "phone",
-            "flex h-11 max-w-44 items-center gap-2 rounded-full border border-line bg-taken pr-3 pl-1.5 text-sm text-ink hover:bg-taken-strong",
+            "flex h-11 max-w-[55%] items-center rounded-full border border-line bg-taken px-3.5 text-sm text-ink",
           )}
         {kind === "closed" && (
           <span title={`Le prenotazioni chiudono ${settings.minHoursBefore} ore prima del turno`}>
@@ -328,33 +421,42 @@ export default async function BookPage({
   }
 
   function gridCell(day: string, slot: Slot) {
-    const { kind, booking: b } = stateOf(day, slot);
+    const { kind, booking: b, late } = stateOf(day, slot);
     const box = "flex h-[52px] w-full items-center rounded-xl text-sm";
     switch (kind) {
       case "free":
         return bookButton(
           day,
           slot,
-          `${box} justify-center border-[1.5px] font-semibold ${
+          late,
+          `${box} justify-center gap-1 border-[1.5px] font-semibold ${
             atLimit
               ? "border-line text-muted"
               : "border-brand-line bg-white text-brand hover:border-brand hover:bg-brand-soft"
           }`,
-          "Libero",
+          // Only admins get here inside the notice window.
+          late ? (
+            <>
+              <LockIcon className="size-4" />
+              Libero<span className="sr-only">, solo admin</span>
+            </>
+          ) : (
+            "Libero"
+          ),
         );
       case "mine":
         return (
           <div className={`${box} flex-col items-start justify-center bg-brand px-2.5 text-white`}>
             <span className="font-semibold">Tuo turno</span>
             {slot.start > now ? (
-              cancelButton(b!, day, "text-xs text-white/90 underline hover:text-white", "Annulla")
+              cancelControl(b!, day, "grid", "text-xs text-white/90 underline hover:text-white", "Annulla")
             ) : (
               <span className="text-xs text-white/90">in corso</span>
             )}
           </div>
         );
       case "taken":
-        return booker(b!, day, slot, "grid", `${box} gap-1.5 bg-taken px-1.5 text-left text-[13px] text-ink hover:bg-taken-strong`);
+        return booker(b!, day, slot, "grid", `${box} bg-taken px-2.5 text-left text-[13px] text-ink`);
       case "closed":
         return (
           <div
@@ -385,11 +487,22 @@ export default async function BookPage({
         <span className="max-sm:hidden">Prenota un turno</span>
       </h1>
       <p className="mt-1 mb-5 text-sm text-ink-2">
-        Turni da {formatDuration(settings.slotMinutes)}. Si prenota almeno {settings.minHoursBefore} ore prima del turno e
-        fino a {formatWindow(settings.maxDaysAhead)} in anticipo.
+        Turni da {formatDuration(settings.slotMinutes)}. Si prenota e si annulla almeno {hours} ore prima del turno, e si
+        prenota fino a {formatWindow(settings.maxDaysAhead)} in anticipo.
       </p>
 
       <Flash code={esito} />
+
+      {isAdmin && (
+        <datalist id="residenti">
+          {residents.map((r) => (
+            <option key={r.username} value={r.username!}>
+              {fullName(r)}
+              {r.room ? ` · stanza ${r.room}` : ""}
+            </option>
+          ))}
+        </datalist>
+      )}
 
       <div className="flex flex-col gap-6 xl:flex-row xl:items-start">
         <aside className="flex flex-col gap-4 xl:order-last xl:w-80 xl:flex-none">
@@ -415,9 +528,10 @@ export default async function BookPage({
                   <span className="truncate">{next.machine.name}</span>
                 </span>
                 {next.start > now &&
-                  cancelButton(
+                  cancelControl(
                     next,
                     selected?.day ?? first,
+                    "next",
                     "h-11 rounded-xl border-[1.5px] border-white/70 px-4 text-[15px] font-semibold text-white hover:bg-white/10",
                     "Annulla turno",
                   )}
@@ -461,8 +575,16 @@ export default async function BookPage({
               </li>
               <li className="flex items-center gap-2.5">
                 <span aria-hidden className="h-[18px] w-7 rounded-md bg-taken-strong" />
-                Occupato: clicca per vedere chi
+                {isAdmin ? "Occupato: clicca per i dettagli" : "Occupato, con il nome di chi ha prenotato"}
               </li>
+              {isAdmin && (
+                <li className="flex items-center gap-2.5">
+                  <span aria-hidden className="grid h-[18px] w-7 place-items-center rounded-md border-[1.5px] border-brand-line">
+                    <LockIcon className="size-3 text-brand" />
+                  </span>
+                  Dentro il preavviso: prenotabile solo dagli admin
+                </li>
+              )}
               <li className="flex items-center gap-2.5">
                 <span aria-hidden className="hatch h-[18px] w-7 rounded-md border border-line" />
                 Chiuso o concluso

@@ -5,6 +5,10 @@ export const ESITI: Record<string, { ok: boolean; text: string }> = {
   salvato: { ok: true, text: "Modifiche salvate." },
   "avviso-pubblicato": { ok: true, text: "Avviso pubblicato." },
   "avviso-rimosso": { ok: true, text: "Avviso rimosso." },
+  "codice-generato": {
+    ok: true,
+    text: "Nuovo codice di registrazione creato. Comunicalo ai residenti: quello di prima non funziona più.",
+  },
   occupato: { ok: false, text: "Questo turno è già stato prenotato." },
   limite: { ok: false, text: "Hai raggiunto il numero massimo di prenotazioni attive. Annullane una per prenotare di nuovo." },
   passato: { ok: false, text: "Non puoi prenotare un turno già concluso." },
@@ -14,6 +18,12 @@ export const ESITI: Record<string, { ok: boolean; text: string }> = {
   macchina: { ok: false, text: "Questa macchina non è disponibile." },
   "non-trovata": { ok: false, text: "Prenotazione non trovata." },
   "gia-iniziata": { ok: false, text: "Non puoi annullare un turno già iniziato o concluso: resta nello storico." },
+  "contatta-admin": {
+    ok: false,
+    text: "Il turno è troppo vicino per annullarlo da qui: contatta l'amministratore, che può annullarlo per te.",
+  },
+  "utente-non-trovato": { ok: false, text: "Nessun utente con questo username." },
+  "limite-utente": { ok: false, text: "Questa persona ha già il numero massimo di prenotazioni attive." },
   "macchina-con-storico": {
     ok: false,
     text: "Questa macchina ha prenotazioni registrate, quindi non si può eliminare: disattivala per toglierla dal calendario.",

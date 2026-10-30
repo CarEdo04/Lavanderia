@@ -5,6 +5,7 @@ import {
   addNotice,
   deleteMachine,
   deleteNotice,
+  generateRegistrationCode,
   markVerified,
   saveRules,
   saveSettings,
@@ -160,10 +161,28 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             Ore minime di anticipo
             <input name="minHoursBefore" type="number" min={0} max={720} defaultValue={settings.minHoursBefore} className={`${field} mt-1 block w-full`} />
           </label>
-          <label className="text-sm text-ink">
-            Codice di registrazione
-            <input name="registrationCode" defaultValue={settings.registrationCode ?? ""} placeholder="vuoto = registrazione libera" className={`${field} mt-1 block w-full`} />
-          </label>
+          <div className="text-sm text-ink">
+            <label htmlFor="registrationCode">Codice di registrazione</label>
+            <div className="mt-1 flex gap-2">
+              <input
+                id="registrationCode"
+                name="registrationCode"
+                defaultValue={settings.registrationCode ?? ""}
+                placeholder="vuoto = registrazione libera"
+                className={`${field} min-w-0 flex-1 font-mono`}
+              />
+              <SubmitButton
+                formAction={generateRegistrationCode}
+                className={secondary}
+                confirm="Generare un nuovo codice?"
+                details={<p className="text-ink-2">Quello attuale smetterà di funzionare: dovrai comunicare il nuovo ai residenti.</p>}
+                confirmLabel="Genera codice"
+              >
+                Genera
+              </SubmitButton>
+            </div>
+            <p className="mt-1 text-xs text-ink-2">Meglio uno difficile da indovinare: «Genera» ne crea uno casuale.</p>
+          </div>
           <fieldset className="text-sm text-ink sm:col-span-3">
             <legend>Giorni di apertura</legend>
             <div className="mt-1 flex flex-wrap gap-x-4 gap-y-2">

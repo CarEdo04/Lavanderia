@@ -15,6 +15,7 @@ export function SubmitButton({
   danger = false,
   pendingText = "Attendere…",
   title,
+  formAction,
 }: {
   children: React.ReactNode;
   className?: string;
@@ -25,6 +26,8 @@ export function SubmitButton({
   danger?: boolean;
   pendingText?: string;
   title?: string;
+  /** Submits the form to this action instead of the form's own. */
+  formAction?: (formData: FormData) => void | Promise<void>;
 }) {
   const { pending } = useFormStatus();
   const button = useRef<HTMLButtonElement>(null);
@@ -38,6 +41,7 @@ export function SubmitButton({
         type="submit"
         disabled={pending}
         title={title}
+        formAction={formAction}
         className={`${className} disabled:cursor-wait disabled:opacity-60`}
         onClick={(e) => {
           if (!confirm) return;
@@ -66,7 +70,8 @@ export function SubmitButton({
               }`}
               onClick={() => {
                 dialog.current?.close();
-                button.current?.form?.requestSubmit();
+                // Passing the button keeps its formAction.
+                button.current?.form?.requestSubmit(button.current);
               }}
             >
               {confirmLabel}

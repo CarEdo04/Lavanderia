@@ -66,6 +66,30 @@ model Notice {
   @@index([endDay])
 }
 
+// A sign-up the app has validated, waiting for Supabase Auth to create the
+// account. A trigger on auth.users turns it into the User row in the same
+// transaction (see the create_profile_on_signup migration), so an account
+// never exists without its profile.
+model PendingSignup {
+  token           String    @id // also sent in the Auth user's metadata
+  email           String
+  firstName       String
+  lastName        String
+  room            String?
+  rulesAcceptedAt DateTime?
+  createdAt       DateTime  @default(now())
+}
+
+// Failed logins and wrong registration codes, for rate limiting (src/lib/throttle.ts).
+model AuthFailure {
+  id        Int      @id @default(autoincrement())
+  kind      String // LOGIN | CODE
+  key       String // "ip:<address>" or "account:<email or username>"
+  createdAt DateTime @default(now())
+
+  @@index([kind, key, createdAt])
+}
+
 // Single row (id = 1) holding the booking rules.
 model Settings {
   id                Int     @id @default(1)

@@ -1,8 +1,8 @@
 "use server";
 
-import { Prisma } from "@prisma/client";
+import { randomBytes } from "node:crypto";
 import { redirect } from "next/navigation";
-import { createBooking, getSettings } from "@/lib/booking";
+import { canCancel, createBooking, getSettings } from "@/lib/booking";
 import { prisma } from "@/lib/db";
 import {
   forgetPendingEmail,
@@ -12,8 +12,8 @@ import {
   requireUser,
   requireVerifiedUser,
 } from "@/lib/session";
-import { appUrl, supabaseAdmin, supabaseServer } from "@/lib/supabase";
-import { availableUsername } from "@/lib/usernames";
+import { appUrl, supabaseServer } from "@/lib/supabase";
+import { clearFailures, clientIp, isThrottled, recordFailure } from "@/lib/throttle";
 import { isValidDay } from "@/lib/time";
 
 // `values` echoes the submitted fields (never the password) so the form can
@@ -24,6 +24,9 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ROOM_RE = /^[A-Za-z0-9 /-]{1,10}$/;
 const MIN_PASSWORD = 8;
 const TOO_MANY_EMAILS = "Sono state inviate troppe email in poco tempo. Riprova più tardi (può volerci fino a un'ora); se il problema continua, contatta l'amministratore.";
+
+// Registration codes are compared without case, spaces or dashes.
+const normalizeCode = (code: string) => code.replace(/[\s-]/g, "").toUpperCase();
 
 // Where the links in Supabase's emails land (see src/app/auth/conferma).
 const confirmUrl = (next?: string) => `${appUrl()}/auth/conferma${next ? `?next=${encodeURIComponent(next)}` : ""}`;
@@ -38,10 +41,17 @@ async function emailFor(identifier: string) {
 export async function login(_: FormState, formData: FormData): Promise<FormState> {
   const identifier = String(formData.get("identifier") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
-  const wrong: FormState = { error: "Credenziali non corrette.", values: { identifier } };
-
   const email = await emailFor(identifier);
-  if (!email) return wrong;
+  const attempt = { kind: "LOGIN" as const, ip: await clientIp(), account: email ?? identifier };
+  const wrong = async (): Promise<FormState> => {
+    await recordFailure(attempt);
+    return { error: "Credenziali non corrette.", values: { identifier } };
+  };
+
+  if (await isThrottled(attempt)) {
+    return { error: "Troppi tentativi non riusciti. Riprova tra un quarto d'ora.", values: { identifier } };
+  }
+  if (!email) return wrong();
 
   const supabase = await supabaseServer();
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -49,7 +59,7 @@ export async function login(_: FormState, formData: FormData): Promise<FormState
     await rememberPendingEmail(email);
     redirect("/verifica-email");
   }
-  if (error?.code === "invalid_credentials") return wrong;
+  if (error?.code === "invalid_credentials") return wrong();
   if (error || !data.user) {
     console.error("Accesso non riuscito", error);
     return { error: "Accesso non riuscito. Riprova tra qualche minuto.", values: { identifier } };
@@ -61,6 +71,7 @@ export async function login(_: FormState, formData: FormData): Promise<FormState
     await supabase.auth.signOut();
     return { error: "Questo account non è registrato nella lavanderia. Contatta l'amministratore.", values: { identifier } };
   }
+  await clearFailures(attempt);
   redirect("/prenota");
 }
 
@@ -85,18 +96,42 @@ export async function register(_: FormState, formData: FormData): Promise<FormSt
   if (!acceptedRules) return fail("Per registrarti devi accettare il regolamento.");
 
   const settings = await getSettings();
-  if (settings.registrationCode && code !== settings.registrationCode) {
-    return fail("Codice di registrazione non corretto. Chiedilo all'amministratore.");
+  if (settings.registrationCode) {
+    const attempt = { kind: "CODE" as const, ip: await clientIp() };
+    if (await isThrottled(attempt)) {
+      return fail("Troppi codici di registrazione errati. Riprova tra un'ora o chiedi il codice all'amministratore.");
+    }
+    if (normalizeCode(code) !== normalizeCode(settings.registrationCode)) {
+      await recordFailure(attempt);
+      return fail("Codice di registrazione non corretto. Chiedilo all'amministratore.");
+    }
   }
   if (await prisma.user.findUnique({ where: { email: values.email } })) return fail(taken);
+
+  // The User row is created by a trigger on auth.users, in the same transaction
+  // as the Supabase account, from this validated row (see PendingSignup in
+  // prisma/schema.prisma): the two can't end up one without the other.
+  const token = randomBytes(32).toString("hex");
+  await prisma.pendingSignup.create({
+    data: {
+      token,
+      email: values.email,
+      firstName: values.firstName,
+      lastName: values.lastName,
+      room: values.room,
+      rulesAcceptedAt: new Date(),
+    },
+  });
 
   // Supabase stores the password and sends the confirmation email.
   const supabase = await supabaseServer();
   const { data, error } = await supabase.auth.signUp({
     email: values.email,
     password,
-    options: { emailRedirectTo: confirmUrl() },
+    options: { emailRedirectTo: confirmUrl(), data: { signup_token: token } },
   });
+  // The trigger has used the row if the account was created; otherwise it's no longer needed.
+  await prisma.pendingSignup.deleteMany({ where: { token } });
   if (error?.code === "weak_password") return fail("Password troppo debole: scegline una più lunga o meno comune.");
   if (error?.code === "user_already_exists" || error?.code === "email_exists") return fail(taken);
   // Supabase limits emails per address and per project (very low with its
@@ -120,32 +155,11 @@ export async function register(_: FormState, formData: FormData): Promise<FormSt
   // With email confirmation on, Supabase answers an existing address with a
   // user that has no identities instead of an error.
   if (!data.user || data.user.identities?.length === 0) return fail(taken);
-
-  // The username is always surname.name (plus a number for homonyms). If a
-  // homonym registers at the same moment, pick the next free one.
-  for (let attempt = 1; ; attempt++) {
-    try {
-      await prisma.user.create({
-        data: {
-          authId: data.user.id,
-          firstName: values.firstName,
-          lastName: values.lastName,
-          email: values.email,
-          username: await availableUsername(prisma, values),
-          room: values.room,
-          rulesAcceptedAt: new Date(),
-          emailVerifiedAt: data.user.email_confirmed_at ? new Date(data.user.email_confirmed_at) : null,
-        },
-      });
-      break;
-    } catch (e) {
-      if (!(e instanceof Prisma.PrismaClientKnownRequestError) || e.code !== "P2002") throw e;
-      const target = String(e.meta?.target ?? "");
-      if (target.includes("username") && attempt < 3) continue;
-      // Someone registered this email a moment ago: undo the Auth account.
-      await supabaseAdmin().auth.admin.deleteUser(data.user.id);
-      return fail(taken);
-    }
+  // Supabase reuses an unconfirmed account left without a profile by older
+  // versions of the app, and then the trigger doesn't run.
+  if (!(await prisma.user.findUnique({ where: { authId: data.user.id }, select: { id: true } }))) {
+    console.error("Account Supabase senza profilo", data.user.id);
+    return fail("Questa email ha un account incompleto. Contatta l'amministratore per eliminarlo, poi riprova.");
   }
 
   // No session means Supabase is waiting for the email to be confirmed.
@@ -224,18 +238,32 @@ function bookingPageParams(formData: FormData) {
   return params;
 }
 
+// Admins can also book for a resident (by username) and inside the notice window.
 export async function book(formData: FormData) {
   const user = await requireVerifiedUser();
+  const isAdmin = user.role === "ADMIN";
   const machineId = Number(formData.get("machineId"));
   const start = new Date(String(formData.get("start")));
-
-  const result = await createBooking(user.id, machineId, start);
   const params = bookingPageParams(formData);
-  params.set("esito", result);
-  redirect(`/prenota?${params}`);
+  const go = (esito: string) => {
+    params.set("esito", esito);
+    redirect(`/prenota?${params}`);
+  };
+
+  let userId = user.id;
+  const forUsername = isAdmin ? String(formData.get("per") ?? "").trim().toLowerCase() : "";
+  if (forUsername) {
+    const target = await prisma.user.findUnique({ where: { username: forUsername }, select: { id: true } });
+    if (!target) return go("utente-non-trovato");
+    userId = target.id;
+  }
+
+  const result = await createBooking(userId, machineId, start, { byAdmin: isAdmin });
+  go(result === "limite" && userId !== user.id ? "limite-utente" : result);
 }
 
-// Owners can cancel their own upcoming bookings; admins can cancel any.
+// Owners can cancel their own bookings until the notice window starts; admins
+// can cancel any booking until the shift starts (see canCancel).
 export async function cancel(formData: FormData) {
   const user = await requireVerifiedUser();
   const id = Number(formData.get("bookingId"));
@@ -253,6 +281,7 @@ export async function cancel(formData: FormData) {
   if (!booking || (booking.userId !== user.id && user.role !== "ADMIN")) return go("non-trovata");
   // Once a shift has started it stays in the history.
   if (booking.start <= new Date()) return go("gia-iniziata");
+  if (!canCancel(booking, user, await getSettings())) return go("contatta-admin");
 
   await prisma.booking.delete({ where: { id } });
   go("annullata");
