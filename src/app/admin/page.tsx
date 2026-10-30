@@ -15,6 +15,7 @@ import {
 } from "./actions";
 import { Flash } from "@/components/Flash";
 import { NoticeBox } from "@/components/Notices";
+import { Pager, pageCount, pageParam } from "@/components/Pager";
 import { SubmitButton } from "@/components/SubmitButton";
 import { getSettings } from "@/lib/booking";
 import { prisma } from "@/lib/db";
@@ -45,27 +46,56 @@ function TypeSelect({ value }: { value?: string }) {
   );
 }
 
-export default async function AdminPage() {
+const BOOKINGS_PER_PAGE = 50;
+const USERS_PER_PAGE = 50;
+
+type Params = { prenotazioni?: string; utenti?: string };
+
+export default async function AdminPage({ searchParams }: { searchParams: Promise<Params> }) {
   const admin = await requireAdmin();
   const now = new Date();
   const first = today();
+  const params = await searchParams;
+  const upcomingWhere = { end: { gt: now } };
 
-  const [settings, machines, bookings, users, notices] = await Promise.all([
+  const [settings, machines, bookingCount, userCount, notices] = await Promise.all([
     getSettings(),
     prisma.machine.findMany({
       orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
       include: { _count: { select: { bookings: true } } },
     }),
-    prisma.booking.findMany({
-      where: { end: { gt: now } },
-      include: { machine: true, user: true },
-      orderBy: { start: "asc" },
-      take: 100,
-    }),
+    prisma.booking.count({ where: upcomingWhere }),
     // Deleted accounts only stay for the booking history.
-    prisma.user.findMany({ where: notDeleted, orderBy: [{ lastName: "asc" }, { firstName: "asc" }] }),
+    prisma.user.count({ where: notDeleted }),
     // Expired notices drop off the list but stay in the database.
     prisma.notice.findMany({ where: { endDay: { gte: first } }, orderBy: [{ startDay: "asc" }, { id: "asc" }] }),
+  ]);
+
+  // Upcoming bookings and users, a page at a time; each list keeps its own page.
+  const bookingPages = pageCount(bookingCount, BOOKINGS_PER_PAGE);
+  const bookingPage = pageParam(params.prenotazioni, bookingPages);
+  const userPages = pageCount(userCount, USERS_PER_PAGE);
+  const userPage = pageParam(params.utenti, userPages);
+  const pageHref = (change: Params) => {
+    const query = new URLSearchParams({ prenotazioni: String(bookingPage), utenti: String(userPage), ...change });
+    for (const [key, value] of [...query]) if (value === "1") query.delete(key);
+    return query.size ? `/admin?${query}` : "/admin";
+  };
+
+  const [bookings, users] = await Promise.all([
+    prisma.booking.findMany({
+      where: upcomingWhere,
+      include: { machine: true, user: true },
+      orderBy: [{ start: "asc" }, { machineId: "asc" }],
+      skip: (bookingPage - 1) * BOOKINGS_PER_PAGE,
+      take: BOOKINGS_PER_PAGE,
+    }),
+    prisma.user.findMany({
+      where: notDeleted,
+      orderBy: [{ lastName: "asc" }, { firstName: "asc" }, { id: "asc" }],
+      skip: (userPage - 1) * USERS_PER_PAGE,
+      take: USERS_PER_PAGE,
+    }),
   ]);
 
   return (
@@ -265,7 +295,7 @@ export default async function AdminPage() {
 
       <section className={card}>
         <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-lg font-semibold text-ink">Prossime prenotazioni</h2>
+          <h2 className="text-lg font-semibold text-ink">Prossime prenotazioni ({bookingCount})</h2>
           <Link href="/admin/storico" className="text-sm font-medium text-brand hover:underline">
             Storico delle prenotazioni ›
           </Link>
@@ -315,10 +345,11 @@ export default async function AdminPage() {
             </table>
           </div>
         )}
+        <Pager page={bookingPage} pages={bookingPages} href={(n) => pageHref({ prenotazioni: String(n) })} />
       </section>
 
       <section className={card}>
-        <h2 className={h2}>Utenti ({users.length})</h2>
+        <h2 className={h2}>Utenti ({userCount})</h2>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -383,6 +414,7 @@ export default async function AdminPage() {
             </tbody>
           </table>
         </div>
+        <Pager page={userPage} pages={userPages} href={(n) => pageHref({ utenti: String(n) })} />
       </section>
     </div>
   );

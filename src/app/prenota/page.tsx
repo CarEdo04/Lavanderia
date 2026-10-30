@@ -111,6 +111,7 @@ export default async function BookPage({
     }),
     prisma.notice.findMany({
       where: { startDay: { lte: lastDay }, endDay: { gte: first } },
+      // Warnings first: the enum is declared INFO, WARNING (see prisma/schema.prisma).
       orderBy: [{ level: "desc" }, { startDay: "asc" }, { id: "asc" }],
     }),
     // Admins can book for someone else, picked from this list.

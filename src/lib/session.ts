@@ -1,8 +1,10 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
+import type { Role } from "@prisma/client";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { prisma } from "./db";
-import { supabaseServer } from "./supabase";
+import { env, supabaseServer } from "./supabase";
 
 // Remembers who just registered (or tried to log in unconfirmed), so the
 // "check your email" page can show the address and resend the link.
@@ -26,6 +28,44 @@ export async function forgetPendingEmail() {
   (await cookies()).delete(PENDING_EMAIL);
 }
 
+// Opening the link in a password-reset email lets that browser choose a new
+// password without the current one, for a limited time. Elsewhere the current
+// password is needed (account page), so someone who gets hold of a signed-in
+// session can't take the account over. The cookie is signed with a key derived
+// from the Supabase secret key: a session alone isn't enough to make one.
+const PASSWORD_RESET = "reimposta-password";
+const PASSWORD_RESET_MINUTES = 30;
+
+function sign(value: string) {
+  const key = createHmac("sha256", env("SUPABASE_SECRET_KEY")).update(PASSWORD_RESET).digest();
+  return createHmac("sha256", key).update(value).digest("base64url");
+}
+
+export async function allowPasswordReset(authId: string) {
+  const value = `${authId}.${Date.now() + PASSWORD_RESET_MINUTES * 60_000}`;
+  (await cookies()).set(PASSWORD_RESET, `${value}.${sign(value)}`, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: PASSWORD_RESET_MINUTES * 60,
+  });
+}
+
+export async function canResetPassword(authId: string) {
+  const [id, expires, mac] = (await cookies()).get(PASSWORD_RESET)?.value.split(".") ?? [];
+  if (!id || !expires || !mac) return false;
+  const expected = Buffer.from(sign(`${id}.${expires}`));
+  const given = Buffer.from(mac);
+  return (
+    given.length === expected.length && timingSafeEqual(given, expected) && id === authId && Number(expires) > Date.now()
+  );
+}
+
+export async function forgetPasswordReset() {
+  (await cookies()).delete(PASSWORD_RESET);
+}
+
 export type CurrentUser = {
   id: number;
   authId: string;
@@ -34,7 +74,7 @@ export type CurrentUser = {
   firstName: string;
   lastName: string;
   room: string | null;
-  role: string;
+  role: Role;
   emailVerifiedAt: Date | null;
   /** The new address of an email change still waiting to be confirmed. */
   emailChangeTo: string | null;

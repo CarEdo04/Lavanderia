@@ -9,6 +9,8 @@ import { prisma } from "@/lib/db";
 import { setFlash } from "@/lib/flash";
 import { baseUsername, deletedAccount } from "@/lib/people";
 import {
+  canResetPassword,
+  forgetPasswordReset,
   forgetPendingEmail,
   getCurrentUser,
   pendingEmail,
@@ -231,17 +233,22 @@ async function saveNewPassword(formData: FormData): Promise<string | null> {
   return null;
 }
 
-// Reached from the password-reset email, which signs the user in.
+// Reached from the password-reset email, which signs the user in. Only that
+// link allows skipping the current password (see allowPasswordReset).
 export async function updatePassword(_: FormState, formData: FormData): Promise<FormState> {
-  await requireUser();
+  const user = await requireUser();
+  if (!(await canResetPassword(user.authId))) {
+    return { error: "Il link è scaduto. Chiedine uno nuovo dalla pagina «Password dimenticata»." };
+  }
   const error = await saveNewPassword(formData);
   if (error) return { error };
+  await forgetPasswordReset();
   await setFlash("password-aggiornata");
   redirect("/prenota");
 }
 
-// The account page asks for the current password before changing the password
-// or deleting the account. Wrong guesses count like failed logins.
+// The account page asks for the current password before changing the email
+// or the password, or deleting the account. Wrong guesses count like failed logins.
 async function checkPassword(email: string, password: string): Promise<string | null> {
   const attempt = { kind: "LOGIN" as const, ip: await clientIp(), account: email };
   if (await isThrottled(attempt)) return "Troppi tentativi non riusciti. Riprova tra un quarto d'ora.";
@@ -309,6 +316,8 @@ export async function changeEmail(_: FormState, formData: FormData): Promise<For
   if (!EMAIL_RE.test(email)) return { error: "Inserisci un indirizzo email valido.", values };
   if (email === user.email) return { error: "È già il tuo indirizzo email.", values };
   if (await prisma.user.findUnique({ where: { email } })) return { error: taken, values };
+  const wrong = await checkPassword(user.email, String(formData.get("current") ?? ""));
+  if (wrong) return { error: wrong, values };
 
   const supabase = await supabaseServer();
   const { error } = await supabase.auth.updateUser({ email }, { emailRedirectTo: confirmUrl("/account") });

@@ -99,6 +99,10 @@ export function EmailForm({ email, pending }: { email: string; pending: string |
         Nuova email <span className={hint}>(riceverai un link di conferma)</span>
         <input name="email" type="email" autoComplete="email" required defaultValue={state?.values?.email} className={input} />
       </label>
+      <label className={label}>
+        Password <span className={hint}>(per confermare che sei tu)</span>
+        <input name="current" type="password" autoComplete="current-password" required className={input} />
+      </label>
       <SubmitButton className={save}>Cambia email</SubmitButton>
     </form>
   );

@@ -22,18 +22,18 @@ model User {
   username        String?   @unique // optional, lowercase, can be used to log in
   room            String?
   rulesAcceptedAt DateTime?
-  role            String    @default("USER") // USER | ADMIN
+  role            Role      @default(USER)
   createdAt       DateTime  @default(now()) // registration date
   bookings        Booking[]
 }
 
 model Machine {
-  id        Int       @id @default(autoincrement())
+  id        Int         @id @default(autoincrement())
   name      String
-  type      String // WASHER | DRYER
-  active    Boolean   @default(true)
-  sortOrder Int       @default(0)
-  createdAt DateTime  @default(now())
+  type      MachineType
+  active    Boolean     @default(true)
+  sortOrder Int         @default(0)
+  createdAt DateTime    @default(now())
   bookings  Booking[]
 }
 
@@ -54,14 +54,31 @@ model Booking {
   @@index([start, end])
 }
 
+enum Role {
+  USER
+  ADMIN
+}
+
+enum MachineType {
+  WASHER
+  DRYER
+}
+
+// Postgres sorts enum values in the order they are declared, so ordering by
+// level puts WARNING notices after (or, descending, before) INFO ones.
+enum NoticeLevel {
+  INFO
+  WARNING
+}
+
 // Admin announcement shown on the booking page for the weeks it overlaps.
 model Notice {
-  id        Int      @id @default(autoincrement())
+  id        Int         @id @default(autoincrement())
   message   String
-  level     String   @default("INFO") // INFO | WARNING
+  level     NoticeLevel @default(INFO)
   startDay  String // YYYY-MM-DD, Europe/Rome, inclusive
   endDay    String // YYYY-MM-DD, inclusive
-  createdAt DateTime @default(now())
+  createdAt DateTime    @default(now())
 
   @@index([endDay])
 }

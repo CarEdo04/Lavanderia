@@ -3,6 +3,7 @@ import { cancel } from "../actions";
 import { CancelLocked } from "@/components/CancelLocked";
 import { Flash } from "@/components/Flash";
 import { PlusIcon } from "@/components/Icons";
+import { Pager, pageCount, pageParam } from "@/components/Pager";
 import { SubmitButton } from "@/components/SubmitButton";
 import { canCancel, getSettings } from "@/lib/booking";
 import { prisma } from "@/lib/db";
@@ -13,23 +14,32 @@ export const metadata = { title: "I miei turni · Lavanderia" };
 
 const cancelClass = "h-11 rounded-xl border border-line px-3.5 text-sm font-medium hover:border-red-300 hover:text-red-700";
 
-export default async function MyBookingsPage() {
+const PAST_PER_PAGE = 30;
+
+export default async function MyBookingsPage({ searchParams }: { searchParams: Promise<{ pagina?: string }> }) {
   const user = await requireVerifiedUser();
   const now = new Date();
+  const pastWhere = { userId: user.id, end: { lte: now } };
 
-  const [upcoming, past, settings] = await Promise.all([
+  const [upcoming, pastCount, settings] = await Promise.all([
     prisma.booking.findMany({
       where: { userId: user.id, end: { gt: now } },
       include: { machine: true },
       orderBy: { start: "asc" },
     }),
-    prisma.booking.findMany({
-      where: { userId: user.id, end: { lte: now } },
-      include: { machine: true },
-      orderBy: { start: "desc" },
-    }),
+    prisma.booking.count({ where: pastWhere }),
     getSettings(),
   ]);
+  // The history, a page at a time.
+  const pages = pageCount(pastCount, PAST_PER_PAGE);
+  const page = pageParam((await searchParams).pagina, pages);
+  const past = await prisma.booking.findMany({
+    where: pastWhere,
+    include: { machine: true },
+    orderBy: [{ start: "desc" }, { id: "desc" }],
+    skip: (page - 1) * PAST_PER_PAGE,
+    take: PAST_PER_PAGE,
+  });
 
   // The history by month, newest first.
   const months: { month: string; bookings: typeof past }[] = [];
@@ -132,7 +142,7 @@ export default async function MyBookingsPage() {
           <div className="mt-8 mb-2.5 flex items-baseline justify-between gap-3">
             <h2 className="text-[17px] font-semibold">Storico</h2>
             <span className="text-[13px] text-ink-2">
-              {past.length} {past.length === 1 ? "turno" : "turni"}
+              {pastCount} {pastCount === 1 ? "turno" : "turni"}
             </span>
           </div>
           <div className="overflow-hidden rounded-[18px] border border-line bg-white">
@@ -160,6 +170,7 @@ export default async function MyBookingsPage() {
               </section>
             ))}
           </div>
+          <Pager page={page} pages={pages} href={(n) => (n === 1 ? "/mie-prenotazioni" : `/mie-prenotazioni?pagina=${n}`)} />
         </>
       )}
     </div>

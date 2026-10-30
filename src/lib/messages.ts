@@ -1,3 +1,5 @@
+import type { MachineType, NoticeLevel } from "@prisma/client";
+
 // Outcomes of actions, shown once on the next page (see src/lib/flash.ts).
 export const ESITI: Record<string, { ok: boolean; text: string }> = {
   prenotata: { ok: true, text: "Prenotazione confermata." },
@@ -45,12 +47,18 @@ export const ESITI: Record<string, { ok: boolean; text: string }> = {
   "operazione-fallita": { ok: false, text: "Operazione non riuscita. Riprova più tardi." },
 };
 
-export const MACHINE_TYPES: Record<string, string> = {
+export const MACHINE_TYPES: Record<MachineType, string> = {
   WASHER: "Lavatrice",
   DRYER: "Asciugatrice",
 };
 
-export const NOTICE_LEVELS: Record<string, string> = {
+export const NOTICE_LEVELS: Record<NoticeLevel, string> = {
   INFO: "Informazione",
   WARNING: "Problema / disservizio",
 };
+
+// Whether a submitted value is one of the record's keys. Own keys only:
+// `"toString" in MACHINE_TYPES` is true.
+export function isKeyOf<K extends string>(record: Record<K, string>, value: string): value is K {
+  return Object.hasOwn(record, value);
+}

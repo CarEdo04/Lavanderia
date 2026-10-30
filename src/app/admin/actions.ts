@@ -1,10 +1,11 @@
 "use server";
 
 import { randomInt } from "node:crypto";
+import { Role } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { setFlash } from "@/lib/flash";
-import { MACHINE_TYPES, NOTICE_LEVELS } from "@/lib/messages";
+import { MACHINE_TYPES, NOTICE_LEVELS, isKeyOf } from "@/lib/messages";
 import { DEFAULT_RULES } from "@/lib/rules";
 import { requireAdmin } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase";
@@ -76,7 +77,7 @@ function machineFields(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   const type = String(formData.get("type"));
   const sortOrder = int(formData, "sortOrder", 0, 999) ?? 0;
-  if (name.length < 1 || name.length > 40 || !(type in MACHINE_TYPES)) return null;
+  if (name.length < 1 || name.length > 40 || !isKeyOf(MACHINE_TYPES, type)) return null;
   return { name, type, sortOrder };
 }
 
@@ -139,7 +140,7 @@ export async function addNotice(formData: FormData) {
   if (
     message.length < 1 ||
     message.length > 500 ||
-    !(level in NOTICE_LEVELS) ||
+    !isKeyOf(NOTICE_LEVELS, level) ||
     !isRealDay(startDay) ||
     !isRealDay(endDay) ||
     endDay < startDay
@@ -178,7 +179,7 @@ export async function setRole(formData: FormData) {
   const admin = await requireAdmin();
   const id = int(formData, "id", 1, Number.MAX_SAFE_INTEGER);
   const role = String(formData.get("role"));
-  if (id === null || (role !== "USER" && role !== "ADMIN")) return done("dati-non-validi");
+  if (id === null || !isKeyOf(Role, role)) return done("dati-non-validi");
   if (id === admin.id) return done("se-stesso");
   await prisma.user.update({ where: { id }, data: { role } });
   return done();
