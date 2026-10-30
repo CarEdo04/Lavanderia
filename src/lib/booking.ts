@@ -56,8 +56,9 @@ export async function createBooking(
   const slot = slotsForDay(day, settings).find((s) => s.start.getTime() === start.getTime());
   if (!slot) return "turno-non-valido";
 
+  // Checked here and not only through the notice window, which admins skip.
   const now = new Date();
-  if (slot.end <= now) return "passato";
+  if (slot.start <= now) return "passato";
   if (!byAdmin && isTooLate(slot, settings, now)) return "troppo-tardi";
   if (day > addDays(today(), settings.maxDaysAhead - 1)) return "troppo-avanti";
 

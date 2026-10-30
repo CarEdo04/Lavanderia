@@ -52,13 +52,14 @@ function closedDaysText(closedWeekdays: string) {
   return days.length > 1 ? `${days.slice(0, -1).join(", ")} e ${days.at(-1)}` : days[0];
 }
 
-type Kind ="free" | "mine" | "taken" | "closed" | "past" | "later";
+type Kind ="free" | "mine" | "taken" | "closed" | "started" | "past" | "later";
 
 const STATUS: Record<Kind, string> = {
   free: "Libero",
   mine: "Il tuo turno",
   taken: "Occupato",
   closed: "Prenotazioni chiuse",
+  started: "In corso",
   past: "Concluso",
   later: "Non ancora prenotabile",
 };
@@ -138,7 +139,9 @@ export default async function BookPage({
         : "taken"
       : slot.end <= now
         ? "past"
-        : day > lastDay
+        : slot.start <= now
+          ? "started"
+          : day > lastDay
           ? "later"
           : late && !isAdmin
             ? "closed"
@@ -375,7 +378,7 @@ export default async function BookPage({
 
   function phoneRow(day: string, slot: Slot) {
     const { kind, booking: b, late } = stateOf(day, slot);
-    const grey = kind === "closed" || kind === "past" || kind === "later";
+    const grey = kind === "closed" || kind === "started" || kind === "past" || kind === "later";
     return (
       <li
         key={slot.start.toISOString()}

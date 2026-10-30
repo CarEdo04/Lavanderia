@@ -13,7 +13,7 @@ export const ESITI: Record<string, { ok: boolean; text: string }> = {
   },
   occupato: { ok: false, text: "Questo turno è già stato prenotato." },
   limite: { ok: false, text: "Hai raggiunto il numero massimo di prenotazioni attive. Annullane una per prenotare di nuovo." },
-  passato: { ok: false, text: "Non puoi prenotare un turno già concluso." },
+  passato: { ok: false, text: "Non puoi prenotare un turno già iniziato o concluso." },
   "troppo-avanti": { ok: false, text: "Non puoi prenotare con così tanto anticipo." },
   "troppo-tardi": { ok: false, text: "Troppo tardi: le prenotazioni per questo turno sono chiuse." },
   "turno-non-valido": { ok: false, text: "Orario non valido. Ricarica la pagina e riprova." },
