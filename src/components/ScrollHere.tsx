@@ -2,12 +2,14 @@
 
 import { useEffect, useRef } from "react";
 
-// Scrolls its parent into view after the page loads, e.g. back to the week
-// a booking was made from.
+// Scrolls the strip its parent sits in sideways so the parent is in the
+// middle, e.g. the chosen day in the row of days.
 export function ScrollHere() {
   const ref = useRef<HTMLSpanElement>(null);
   useEffect(() => {
-    ref.current?.parentElement?.scrollIntoView({ block: "start" });
+    const item = ref.current?.parentElement;
+    const strip = item?.parentElement;
+    if (item && strip) strip.scrollLeft = item.offsetLeft - (strip.clientWidth - item.offsetWidth) / 2;
   }, []);
   return <span ref={ref} hidden />;
 }

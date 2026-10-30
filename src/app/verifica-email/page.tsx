@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { logout, resendVerification } from "../actions";
+import { AuthCard } from "@/components/AuthCard";
 import { Flash } from "@/components/Flash";
 import { SubmitButton } from "@/components/SubmitButton";
 import { getCurrentUser, pendingEmail } from "@/lib/session";
@@ -14,31 +15,31 @@ export default async function VerifyEmailPage({ searchParams }: { searchParams: 
   const email = user?.email ?? (await pendingEmail());
   if (!email) redirect("/login");
   const { esito } = await searchParams;
+  const secondary = "flex h-[50px] items-center justify-center rounded-2xl border border-line px-5 font-medium text-ink hover:bg-ground";
 
   return (
-    <div className="mx-auto max-w-md py-10">
-      <h1 className="mb-1 text-2xl font-semibold text-slate-900">Conferma la tua email</h1>
-      <p className="mb-6 text-slate-600">
-        Ti abbiamo inviato un link a <strong className="text-slate-900">{email}</strong>. Aprilo per attivare
+    <AuthCard title="Conferma la tua email">
+      <p className="mb-5 text-ink-2">
+        Ti abbiamo inviato un link a <strong className="break-all text-ink">{email}</strong>. Aprilo per attivare
         l&apos;account e iniziare a prenotare. Se non lo trovi, controlla anche nella posta indesiderata.
       </p>
       <Flash code={esito} />
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-col gap-2.5">
         <form action={resendVerification}>
-          <SubmitButton className="rounded-lg bg-sky-600 px-4 py-2 font-medium text-white hover:bg-sky-700">
+          <SubmitButton className="h-[52px] w-full rounded-2xl bg-brand px-5 font-semibold text-white hover:bg-brand-strong">
             Invia di nuovo
           </SubmitButton>
         </form>
         {user ? (
           <form action={logout}>
-            <button className="rounded-lg border border-slate-300 px-4 py-2 text-slate-700 hover:bg-slate-50">Esci</button>
+            <button className={`${secondary} w-full`}>Esci</button>
           </form>
         ) : (
-          <Link href="/login" className="rounded-lg border border-slate-300 px-4 py-2 text-slate-700 hover:bg-slate-50">
+          <Link href="/login" className={secondary}>
             Torna all&apos;accesso
           </Link>
         )}
       </div>
-    </div>
+    </AuthCard>
   );
 }

@@ -7,15 +7,15 @@ import { baseUsername } from "@/lib/people";
 import { SubmitButton } from "./SubmitButton";
 
 const input =
-  "mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200";
-const label = "block text-sm font-medium text-slate-700";
-const hint = "font-normal text-slate-500";
-const button = "w-full rounded-lg bg-sky-600 px-4 py-2.5 font-medium text-white hover:bg-sky-700";
+  "mt-1.5 block h-12 w-full rounded-xl border-[1.5px] border-line bg-white px-3.5 text-base font-normal text-ink focus:border-brand focus:ring-3 focus:ring-brand/20 focus:outline-none";
+const label = "block text-sm font-semibold text-ink";
+const hint = "font-normal text-ink-2";
+const button = "h-[52px] w-full rounded-2xl bg-brand px-4 font-semibold text-white hover:bg-brand-strong";
 
 function FormError({ state }: { state: FormState }) {
   if (!state?.error) return null;
   return (
-    <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+    <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
       {state.error}
     </p>
   );
@@ -24,7 +24,7 @@ function FormError({ state }: { state: FormState }) {
 function FormNotice({ state }: { state: FormState }) {
   if (!state?.notice) return null;
   return (
-    <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+    <p role="status" className="rounded-xl border border-brand-line bg-brand-soft px-3 py-2 text-sm text-brand-ink">
       {state.notice}
     </p>
   );
@@ -51,14 +51,14 @@ export function LoginForm() {
         <input name="password" type="password" autoComplete="current-password" required className={input} />
       </label>
       <p className="-mt-2 text-right text-sm">
-        <Link href="/password-dimenticata" className="text-sky-700 hover:underline">
+        <Link href="/password-dimenticata" className="text-brand hover:underline">
           Password dimenticata?
         </Link>
       </p>
       <SubmitButton className={button}>Accedi</SubmitButton>
-      <p className="text-center text-sm text-slate-600">
+      <p className="text-center text-sm text-ink-2">
         Non hai un account?{" "}
-        <Link href="/registrati" className="font-medium text-sky-700 hover:underline">
+        <Link href="/registrati" className="font-medium text-brand hover:underline">
           Registrati
         </Link>
       </p>
@@ -102,9 +102,9 @@ export function RegisterForm({ needsCode, rules }: { needsCode: boolean; rules: 
             />
           </label>
         </div>
-        <p className="mt-1.5 text-sm text-slate-500" aria-live="polite">
+        <p className="mt-1.5 text-sm text-ink-2" aria-live="polite">
           Username per accedere:{" "}
-          {typed ? <strong className="font-medium text-slate-800">{baseUsername(names)}</strong> : "cognome.nome"}
+          {typed ? <strong className="font-medium text-ink">{baseUsername(names)}</strong> : "cognome.nome"}
           {typed && " (con un numero in più se è già usato)"}
         </p>
       </div>
@@ -127,21 +127,21 @@ export function RegisterForm({ needsCode, rules }: { needsCode: boolean; rules: 
         </label>
       )}
 
-      <div className="rounded-lg border border-slate-200 bg-white p-3 text-sm">
+      <div className="rounded-lg border border-line p-3.5 text-sm">
         <details>
-          <summary className="cursor-pointer font-medium text-sky-700">Leggi il regolamento</summary>
-          <div className="mt-2 max-h-60 overflow-y-auto whitespace-pre-line text-slate-700">{rules}</div>
+          <summary className="cursor-pointer font-medium text-brand">Leggi il regolamento</summary>
+          <div className="mt-2 max-h-60 overflow-y-auto whitespace-pre-line text-ink">{rules}</div>
         </details>
-        <label className="mt-3 flex items-start gap-2 text-slate-700">
-          <input type="checkbox" name="rules" value="si" required className="mt-0.5 h-4 w-4 accent-sky-600" />
+        <label className="mt-3 flex items-start gap-2 text-ink">
+          <input type="checkbox" name="rules" value="si" required className="mt-0.5 h-4 w-4 accent-brand" />
           Ho letto e accetto il regolamento della lavanderia
         </label>
       </div>
 
       <SubmitButton className={button}>Crea account</SubmitButton>
-      <p className="text-center text-sm text-slate-600">
+      <p className="text-center text-sm text-ink-2">
         Hai già un account?{" "}
-        <Link href="/login" className="font-medium text-sky-700 hover:underline">
+        <Link href="/login" className="font-medium text-brand hover:underline">
           Accedi
         </Link>
       </p>
@@ -167,8 +167,8 @@ export function ResetRequestForm() {
         />
       </label>
       <SubmitButton className={button}>Invia il link</SubmitButton>
-      <p className="text-center text-sm text-slate-600">
-        <Link href="/login" className="font-medium text-sky-700 hover:underline">
+      <p className="text-center text-sm text-ink-2">
+        <Link href="/login" className="font-medium text-brand hover:underline">
           Torna all&apos;accesso
         </Link>
       </p>

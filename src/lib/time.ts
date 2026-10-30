@@ -49,6 +49,12 @@ export function addDays(day: string, n: number): string {
   return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
 }
 
+// "oggi", "domani", "tra 3 giorni".
+export function daysUntil(day: string): string {
+  const n = Math.round((Date.parse(day) - Date.parse(today())) / 86_400_000);
+  return n <= 0 ? "oggi" : n === 1 ? "domani" : `tra ${n} giorni`;
+}
+
 export function formatDay(day: string, opts: Intl.DateTimeFormatOptions = { weekday: "short", day: "numeric", month: "short" }): string {
   const [y, m, d] = day.split("-").map(Number);
   return new Intl.DateTimeFormat("it-IT", { ...opts, timeZone: "UTC" }).format(new Date(Date.UTC(y, m - 1, d)));

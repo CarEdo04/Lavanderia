@@ -7,8 +7,8 @@ export default async function RulesPage() {
   const settings = await getSettings();
   return (
     <div className="max-w-2xl">
-      <h1 className="mb-4 text-2xl font-semibold text-slate-900">Regolamento della lavanderia</h1>
-      <div className="whitespace-pre-line rounded-xl border border-slate-200 bg-white p-5 leading-relaxed text-slate-700">
+      <h1 className="mb-4 text-3xl font-bold tracking-tight">Regolamento della lavanderia</h1>
+      <div className="whitespace-pre-line rounded-2xl border border-line bg-white p-5 leading-relaxed text-ink">
         {rulesText(settings)}
       </div>
     </div>

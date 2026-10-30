@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { AuthCard } from "@/components/AuthCard";
 import { LoginForm } from "@/components/AuthForms";
 import { Flash } from "@/components/Flash";
 import { getCurrentUser } from "@/lib/session";
@@ -9,11 +10,9 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   if (await getCurrentUser()) redirect("/prenota");
   const { esito } = await searchParams;
   return (
-    <div className="mx-auto max-w-sm py-10">
-      <h1 className="mb-1 text-2xl font-semibold text-slate-900">Accedi</h1>
-      <p className="mb-6 text-sm text-slate-600">Prenota la lavanderia del tuo condominio.</p>
+    <AuthCard title="Accedi" intro="Prenota la lavanderia del tuo condominio.">
       <Flash code={esito} />
       <LoginForm />
-    </div>
+    </AuthCard>
   );
 }

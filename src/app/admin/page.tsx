@@ -25,12 +25,12 @@ import { WEEKDAYS, addDays, dayOf, formatDate, formatDay, formatDuration, format
 
 export const metadata = { title: "Gestione · Lavanderia" };
 
-const card = "rounded-xl border border-slate-200 bg-white p-4 sm:p-5";
-const h2 = "mb-3 text-lg font-semibold text-slate-900";
-const field = "rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900";
-const primary = "rounded-md bg-sky-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-700";
-const secondary = "rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50";
-const danger = "rounded-md border border-red-200 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50";
+const card = "rounded-2xl border border-line bg-white p-4 sm:p-6";
+const h2 = "mb-3 text-lg font-semibold";
+const field = "rounded-lg border-[1.5px] border-line bg-white px-2.5 py-2 text-sm text-ink focus:border-brand focus:outline-none";
+const primary = "rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-strong";
+const secondary = "rounded-xl border border-line bg-white px-3.5 py-2 text-sm font-medium text-ink hover:bg-ground";
+const danger = "rounded-xl border border-red-200 px-3.5 py-2 text-sm font-medium text-red-700 hover:bg-red-50";
 
 function TypeSelect({ value }: { value?: string }) {
   return (
@@ -69,13 +69,13 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold text-slate-900">Gestione</h1>
+      <h1 className="text-3xl font-bold tracking-tight">Gestione</h1>
       <Flash code={esito} />
 
       <section className={card}>
         <h2 className={h2}>Avvisi</h2>
-        <p className="mb-3 text-sm text-slate-600">
-          Compaiono sopra la griglia di prenotazione nelle settimane che includono il periodo indicato.
+        <p className="mb-3 text-sm text-ink-2">
+          Compaiono in cima alla pagina Prenota fino alla fine del periodo indicato.
         </p>
         {notices.length > 0 && (
           <div className="mb-4 space-y-2">
@@ -83,7 +83,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               <NoticeBox key={n.id} notice={n}>
                 <form action={deleteNotice}>
                   <input type="hidden" name="id" value={n.id} />
-                  <SubmitButton className={`${danger} bg-white`} confirm="Rimuovere questo avviso?">
+                  <SubmitButton className={`${danger} bg-white`} confirm="Rimuovere questo avviso?" confirmLabel="Rimuovi" danger>
                     Rimuovi
                   </SubmitButton>
                 </form>
@@ -91,8 +91,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             ))}
           </div>
         )}
-        <form action={addNotice} className="grid gap-3 border-t border-slate-200 pt-4 sm:grid-cols-3">
-          <label className="text-sm text-slate-700 sm:col-span-3">
+        <form action={addNotice} className="grid gap-3 border-t border-line pt-4 sm:grid-cols-3">
+          <label className="text-sm text-ink sm:col-span-3">
             Messaggio
             <textarea
               name="message"
@@ -103,7 +103,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               className={`${field} mt-1 block w-full`}
             />
           </label>
-          <label className="text-sm text-slate-700">
+          <label className="text-sm text-ink">
             Tipo
             <select name="level" defaultValue="INFO" className={`${field} mt-1 block w-full`}>
               {Object.entries(NOTICE_LEVELS).map(([k, label]) => (
@@ -113,11 +113,11 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               ))}
             </select>
           </label>
-          <label className="text-sm text-slate-700">
+          <label className="text-sm text-ink">
             Dal
             <input name="startDay" type="date" required defaultValue={first} className={`${field} mt-1 block w-full`} />
           </label>
-          <label className="text-sm text-slate-700">
+          <label className="text-sm text-ink">
             Al
             <input name="endDay" type="date" required defaultValue={addDays(first, 6)} className={`${field} mt-1 block w-full`} />
           </label>
@@ -130,7 +130,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       <section className={card}>
         <h2 className={h2}>Regole di prenotazione</h2>
         <form action={saveSettings} className="grid gap-4 sm:grid-cols-3">
-          <label className="text-sm text-slate-700">
+          <label className="text-sm text-ink">
             Durata turno
             <select name="slotMinutes" defaultValue={settings.slotMinutes} className={`${field} mt-1 block w-full`}>
               {[30, 45, 60, 90, 120, 150, 180, 240].map((m) => (
@@ -140,31 +140,31 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               ))}
             </select>
           </label>
-          <label className="text-sm text-slate-700">
+          <label className="text-sm text-ink">
             Apertura (ora)
             <input name="openHour" type="number" min={0} max={23} defaultValue={settings.openHour} className={`${field} mt-1 block w-full`} />
           </label>
-          <label className="text-sm text-slate-700">
+          <label className="text-sm text-ink">
             Chiusura (ora)
             <input name="closeHour" type="number" min={1} max={24} defaultValue={settings.closeHour} className={`${field} mt-1 block w-full`} />
           </label>
-          <label className="text-sm text-slate-700">
+          <label className="text-sm text-ink">
             Prenotazioni attive per persona
             <input name="maxActiveBookings" type="number" min={1} max={50} defaultValue={settings.maxActiveBookings} className={`${field} mt-1 block w-full`} />
           </label>
-          <label className="text-sm text-slate-700">
+          <label className="text-sm text-ink">
             Giorni prenotabili in anticipo
             <input name="maxDaysAhead" type="number" min={1} max={60} defaultValue={settings.maxDaysAhead} className={`${field} mt-1 block w-full`} />
           </label>
-          <label className="text-sm text-slate-700">
+          <label className="text-sm text-ink">
             Ore minime di anticipo
             <input name="minHoursBefore" type="number" min={0} max={720} defaultValue={settings.minHoursBefore} className={`${field} mt-1 block w-full`} />
           </label>
-          <label className="text-sm text-slate-700">
+          <label className="text-sm text-ink">
             Codice di registrazione
             <input name="registrationCode" defaultValue={settings.registrationCode ?? ""} placeholder="vuoto = registrazione libera" className={`${field} mt-1 block w-full`} />
           </label>
-          <fieldset className="text-sm text-slate-700 sm:col-span-3">
+          <fieldset className="text-sm text-ink sm:col-span-3">
             <legend>Giorni di apertura</legend>
             <div className="mt-1 flex flex-wrap gap-x-4 gap-y-2">
               {[1, 2, 3, 4, 5, 6, 0].map((d) => (
@@ -174,7 +174,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                     name="openDays"
                     value={d}
                     defaultChecked={!settings.closedWeekdays.includes(String(d))}
-                    className="h-4 w-4 accent-sky-600"
+                    className="h-4 w-4 accent-brand"
                   />
                   {WEEKDAYS[d]}
                 </label>
@@ -189,7 +189,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
       <section className={card}>
         <h2 className={h2}>Regolamento</h2>
-        <p className="mb-2 text-sm text-slate-600">
+        <p className="mb-2 text-sm text-ink-2">
           Chi si registra deve accettarlo. Lascia vuoto per usare il testo predefinito. Righe vuote separano i paragrafi.
         </p>
         <form action={saveRules} className="space-y-3">
@@ -207,7 +207,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
       <section className={card}>
         <h2 className={h2}>Macchine</h2>
-        <ul className="divide-y divide-slate-100">
+        <ul className="divide-y divide-line-soft">
           {machines.map((m) => (
             <li key={m.id} className="flex flex-wrap items-center gap-2 py-3">
               <form action={updateMachine} className="flex flex-wrap items-center gap-2">
@@ -225,18 +225,18 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               {m._count.bookings === 0 ? (
                 <form action={deleteMachine}>
                   <input type="hidden" name="id" value={m.id} />
-                  <SubmitButton className={danger} confirm={`Eliminare "${m.name}"?`}>
+                  <SubmitButton className={danger} confirm={`Eliminare "${m.name}"?`} confirmLabel="Elimina" danger>
                     Elimina
                   </SubmitButton>
                 </form>
               ) : (
-                <span className="text-xs text-slate-500">{m._count.bookings} prenotazioni nello storico</span>
+                <span className="text-xs text-ink-2">{m._count.bookings} prenotazioni nello storico</span>
               )}
               {!m.active && <span className="rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-800">Fuori servizio</span>}
             </li>
           ))}
         </ul>
-        <form action={addMachine} className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-4">
+        <form action={addMachine} className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-4">
           <input name="name" required maxLength={40} placeholder="Nome nuova macchina" className={`${field} w-48`} aria-label="Nome nuova macchina" />
           <TypeSelect />
           <input name="sortOrder" type="number" min={0} max={999} defaultValue={machines.length + 1} className={`${field} w-16`} aria-label="Ordine" />
@@ -246,18 +246,18 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
       <section className={card}>
         <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-lg font-semibold text-slate-900">Prossime prenotazioni</h2>
-          <Link href="/admin/storico" className="text-sm font-medium text-sky-700 hover:underline">
+          <h2 className="text-lg font-semibold text-ink">Prossime prenotazioni</h2>
+          <Link href="/admin/storico" className="text-sm font-medium text-brand hover:underline">
             Storico delle prenotazioni ›
           </Link>
         </div>
         {bookings.length === 0 ? (
-          <p className="text-sm text-slate-600">Nessuna prenotazione in programma.</p>
+          <p className="text-sm text-ink-2">Nessuna prenotazione in programma.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-200 text-left text-slate-500">
+                <tr className="border-b border-line text-left text-ink-2">
                   <th className="py-2 pr-3 font-medium">Giorno</th>
                   <th className="py-2 pr-3 font-medium">Orario</th>
                   <th className="py-2 pr-3 font-medium">Macchina</th>
@@ -267,15 +267,15 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               </thead>
               <tbody>
                 {bookings.map((b) => (
-                  <tr key={b.id} className="border-b border-slate-100 last:border-0">
+                  <tr key={b.id} className="border-b border-line-soft last:border-0">
                     <td className="py-2 pr-3 capitalize">{formatDay(dayOf(b.start))}</td>
-                    <td className="py-2 pr-3 tabular-nums">
+                    <td className="py-2 pr-3 font-mono">
                       {formatTime(b.start)}–{formatTime(b.end)}
                     </td>
                     <td className="py-2 pr-3">{b.machine.name}</td>
                     <td className="py-2 pr-3">
                       {fullName(b.user)}
-                      {b.user.room && <span className="text-slate-500"> (stanza {b.user.room})</span>}
+                      {b.user.room && <span className="text-ink-2"> (stanza {b.user.room})</span>}
                     </td>
                     <td className="py-2 text-right">
                       {b.start <= now ? (
@@ -284,7 +284,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                         <form action={cancel}>
                           <input type="hidden" name="bookingId" value={b.id} />
                           <input type="hidden" name="back" value="admin" />
-                          <SubmitButton className={danger} confirm={`Annullare la prenotazione di ${fullName(b.user)}?`}>
+                          <SubmitButton className={danger} confirm={`Annullare la prenotazione di ${fullName(b.user)}?`} confirmLabel="Annulla prenotazione" danger>
                             Annulla
                           </SubmitButton>
                         </form>
@@ -303,7 +303,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-200 text-left text-slate-500">
+              <tr className="border-b border-line text-left text-ink-2">
                 <th className="py-2 pr-3 font-medium">Nome</th>
                 <th className="py-2 pr-3 font-medium">Cognome</th>
                 <th className="py-2 pr-3 font-medium">Username</th>
@@ -316,13 +316,13 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             </thead>
             <tbody>
               {users.map((u) => (
-                <tr key={u.id} className="border-b border-slate-100 align-top last:border-0">
-                  <td className="py-2 pr-3 font-medium text-slate-900">
+                <tr key={u.id} className="border-b border-line-soft align-top last:border-0">
+                  <td className="py-2 pr-3 font-medium text-ink">
                     {u.firstName}
-                    {u.role === "ADMIN" && <span className="ml-2 rounded bg-sky-100 px-2 py-0.5 text-xs font-normal text-sky-800">Admin</span>}
+                    {u.role === "ADMIN" && <span className="ml-2 rounded bg-brand-soft px-2 py-0.5 text-xs font-normal text-brand-ink">Admin</span>}
                   </td>
-                  <td className="py-2 pr-3">{u.lastName || <span className="text-slate-400">—</span>}</td>
-                  <td className="py-2 pr-3">{u.username ?? <span className="text-slate-400">—</span>}</td>
+                  <td className="py-2 pr-3">{u.lastName || <span className="text-muted">—</span>}</td>
+                  <td className="py-2 pr-3">{u.username ?? <span className="text-muted">—</span>}</td>
                   <td className="py-2 pr-3">
                     <div>{u.email}</div>
                     {u.emailVerifiedAt ? (
@@ -331,15 +331,15 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                       <span className="text-xs text-amber-700">da verificare</span>
                     )}
                   </td>
-                  <td className="py-2 pr-3">{u.room ?? <span className="text-slate-400">—</span>}</td>
+                  <td className="py-2 pr-3">{u.room ?? <span className="text-muted">—</span>}</td>
                   <td className="py-2 pr-3 whitespace-nowrap">
                     {u.rulesAcceptedAt ? (
                       `accettato il ${formatDate(u.rulesAcceptedAt)}`
                     ) : (
-                      <span className="text-slate-400">non accettato</span>
+                      <span className="text-muted">non accettato</span>
                     )}
                   </td>
-                  <td className="py-2 pr-3 whitespace-nowrap tabular-nums">{formatDate(u.createdAt)}</td>
+                  <td className="py-2 pr-3 whitespace-nowrap font-mono">{formatDate(u.createdAt)}</td>
                   <td className="py-2">
                     <div className="flex justify-end gap-2">
                       {!u.emailVerifiedAt && (

@@ -1,11 +1,51 @@
 @import "tailwindcss";
 
 @theme inline {
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-schibsted);
+  --font-mono: var(--font-plex-mono);
+}
+
+/* "Etichetta": laundry blue on cool grey, times set in mono like a care label. */
+@theme {
+  --color-ground: #edf0f3;
+  --color-ink: #0e1e33;
+  --color-ink-2: #4a5868;
+  --color-muted: #5f6b78;
+  --color-line: #d5dce3;
+  --color-line-soft: #e6eaef;
+  --color-brand: #1f48d6;
+  --color-brand-strong: #16359f;
+  --color-brand-soft: #eef2fd;
+  --color-brand-line: #9fb3f0;
+  --color-brand-ink: #10265e;
+  --color-taken: #eef1f4;
+  --color-taken-strong: #dde3ea;
+  --color-warn: #fff1d9;
+  --color-warn-line: #f2c877;
+  --color-warn-strong: #7a4300;
+  --color-warn-ink: #3d2400;
 }
 
 body {
-  background: #f8fafc;
-  color: #0f172a;
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  background: var(--color-ground);
+  color: var(--color-ink);
+  font-family: var(--font-schibsted), Arial, Helvetica, sans-serif;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+/* Small uppercase mono label above a title. */
+@utility eyebrow {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Stripes for shifts that can't be booked. */
+@utility hatch {
+  background: repeating-linear-gradient(135deg, #f6f7f9 0 7px, #eceff3 7px 14px);
 }

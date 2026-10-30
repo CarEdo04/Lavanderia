@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { AlertIcon, InfoIcon } from "./Icons";
 import { formatDay } from "@/lib/time";
 
 type Notice = { id: number; message: string; level: string; startDay: string; endDay: string };
@@ -14,15 +15,20 @@ export function NoticeBox({ notice, children }: { notice: Notice; children?: Rea
   return (
     <div
       role={warning ? "alert" : "status"}
-      className={`flex flex-wrap items-start justify-between gap-3 rounded-lg border px-4 py-3 text-sm ${
-        warning ? "border-amber-300 bg-amber-50 text-amber-950" : "border-sky-200 bg-sky-50 text-sky-950"
+      className={`flex flex-wrap items-start gap-3 rounded-2xl border px-4 py-3 text-sm ${
+        warning ? "border-warn-line bg-warn text-warn-ink" : "border-brand-line bg-brand-soft text-brand-ink"
       }`}
     >
+      {warning ? (
+        <AlertIcon className="mt-0.5 size-5 flex-none text-warn-strong" />
+      ) : (
+        <InfoIcon className="mt-0.5 size-5 flex-none text-brand" />
+      )}
       <div className="min-w-0 flex-1">
-        <p className="mb-1 text-xs font-medium uppercase tracking-wide opacity-75">
+        <p className={`eyebrow mb-0.5 text-[11px] ${warning ? "text-warn-strong" : "text-brand"}`}>
           {warning ? "Attenzione" : "Avviso"} · {noticePeriod(notice)}
         </p>
-        <p className="whitespace-pre-line break-words">{notice.message}</p>
+        <p className="leading-snug break-words whitespace-pre-line">{notice.message}</p>
       </div>
       {children}
     </div>
@@ -32,7 +38,7 @@ export function NoticeBox({ notice, children }: { notice: Notice; children?: Rea
 export function Notices({ notices }: { notices: Notice[] }) {
   if (notices.length === 0) return null;
   return (
-    <div className="mb-4 space-y-2">
+    <div className="mb-5 space-y-2">
       {notices.map((n) => (
         <NoticeBox key={n.id} notice={n} />
       ))}

@@ -1,3 +1,4 @@
+import { AuthCard } from "@/components/AuthCard";
 import { NewPasswordForm } from "@/components/AuthForms";
 import { requireUser } from "@/lib/session";
 
@@ -7,12 +8,15 @@ export const metadata = { title: "Nuova password · Lavanderia" };
 export default async function NewPasswordPage() {
   const user = await requireUser();
   return (
-    <div className="mx-auto max-w-sm py-10">
-      <h1 className="mb-1 text-2xl font-semibold text-slate-900">Scegli una nuova password</h1>
-      <p className="mb-6 text-sm text-slate-600">
-        Account: <strong className="text-slate-900">{user.email}</strong>
-      </p>
+    <AuthCard
+      title="Scegli una nuova password"
+      intro={
+        <>
+          Account: <strong className="font-semibold break-all">{user.email}</strong>
+        </>
+      }
+    >
       <NewPasswordForm />
-    </div>
+    </AuthCard>
   );
 }

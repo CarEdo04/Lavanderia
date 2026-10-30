@@ -6,8 +6,8 @@ export function Flash({ code }: { code?: string }) {
   return (
     <div
       role="status"
-      className={`mb-4 rounded-lg border px-4 py-3 text-sm ${
-        msg.ok ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-800"
+      className={`mb-4 rounded-2xl border px-4 py-3 text-sm font-medium ${
+        msg.ok ? "border-brand-line bg-brand-soft text-brand-ink" : "border-red-200 bg-red-50 text-red-800"
       }`}
     >
       {msg.text}

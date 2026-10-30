@@ -41,17 +41,17 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
   const prev = month > firstMonth ? addMonths(month, -1) : null;
   const next = month < lastMonth ? addMonths(month, 1) : null;
 
-  const navLink = "rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 hover:border-sky-300";
+  const navLink = "flex min-h-11 items-center gap-1 rounded-xl border border-line bg-white px-3.5 text-sm font-medium text-ink hover:border-brand-line";
   const th = "py-2 pr-3 font-medium";
 
   return (
     <div className="space-y-4">
       <div>
-        <Link href="/admin" className="text-sm text-sky-700 hover:underline">
+        <Link href="/admin" className="text-sm font-medium text-brand hover:underline">
           ‹ Gestione
         </Link>
-        <h1 className="text-2xl font-semibold text-slate-900">Storico delle prenotazioni</h1>
-        <p className="text-sm text-slate-600">
+        <h1 className="text-3xl font-bold tracking-tight">Storico delle prenotazioni</h1>
+        <p className="text-sm text-ink-2">
           Tutti i turni prenotati, anche quelli passati. Le prenotazioni annullate prima dell&apos;inizio del turno non
           compaiono.
         </p>
@@ -65,7 +65,7 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
         ) : (
           <span />
         )}
-        <h2 className="text-center font-semibold capitalize text-slate-900">
+        <h2 className="text-center font-semibold capitalize text-ink">
           {monthLabel(month)} · {bookings.length} {bookings.length === 1 ? "turno" : "turni"}
         </h2>
         {next ? (
@@ -77,14 +77,14 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
         )}
       </div>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+      <section className="rounded-2xl border border-line bg-white p-4 sm:p-5">
         {bookings.length === 0 ? (
-          <p className="text-sm text-slate-600">Nessuna prenotazione in questo mese.</p>
+          <p className="text-sm text-ink-2">Nessuna prenotazione in questo mese.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-200 text-left text-slate-500">
+                <tr className="border-b border-line text-left text-ink-2">
                   <th className={th}>Giorno</th>
                   <th className={th}>Orario</th>
                   <th className={th}>Macchina</th>
@@ -96,12 +96,12 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
               </thead>
               <tbody>
                 {bookings.map((b) => (
-                  <tr key={b.id} className="border-b border-slate-100 last:border-0">
+                  <tr key={b.id} className="border-b border-line-soft last:border-0">
                     <td className="whitespace-nowrap py-2 pr-3 capitalize">
                       {formatDay(dayOf(b.start))}
-                      {b.start > now && <span className="ml-2 text-xs normal-case text-sky-700">in programma</span>}
+                      {b.start > now && <span className="ml-2 text-xs normal-case text-brand">in programma</span>}
                     </td>
-                    <td className="whitespace-nowrap py-2 pr-3 tabular-nums">
+                    <td className="whitespace-nowrap py-2 pr-3 font-mono">
                       {formatTime(b.start)}–{formatTime(b.end)}
                     </td>
                     <td className="py-2 pr-3">{b.machine.name}</td>

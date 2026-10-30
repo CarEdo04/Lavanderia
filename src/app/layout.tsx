@@ -1,13 +1,22 @@
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
+import { IBM_Plex_Mono, Schibsted_Grotesk } from "next/font/google";
 import Link from "next/link";
 import { logout } from "./actions";
+import { LogoutIcon, WasherIcon } from "@/components/Icons";
+import { TabBar, TopNav } from "@/components/Nav";
+import { fullName, initials } from "@/lib/people";
 import { getCurrentUser } from "@/lib/session";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const sans = Schibsted_Grotesk({
+  variable: "--font-schibsted",
   subsets: ["latin"],
+});
+
+const mono = IBM_Plex_Mono({
+  variable: "--font-plex-mono",
+  subsets: ["latin"],
+  weight: ["400", "500"],
 });
 
 export const metadata: Metadata = {
@@ -21,45 +30,55 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const user = await getCurrentUser();
-  const link = "rounded-md px-2.5 py-1.5 text-slate-700 hover:bg-slate-100";
+  const isAdmin = user?.role === "ADMIN";
 
   return (
     <html lang="it">
-      <body className={`${geistSans.variable} antialiased`}>
-        <header className="border-b border-slate-200 bg-white">
-          <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
-            <Link href="/" className="flex items-center gap-2 font-semibold text-slate-900">
-              <span aria-hidden className="grid h-7 w-7 place-items-center rounded-full bg-sky-600 text-sm text-white">
-                L
+      <body className={`${sans.variable} ${mono.variable} antialiased`}>
+        <header className="border-b border-line bg-white">
+          <div className="mx-auto flex max-w-7xl items-center gap-x-6 px-4 py-2.5 sm:px-6">
+            <Link href="/" className="flex min-h-11 items-center gap-2.5 text-ink">
+              <span className="grid size-[34px] place-items-center rounded-[10px] bg-brand text-white">
+                <WasherIcon className="size-[22px]" />
               </span>
-              Lavanderia
+              <span className="text-lg font-bold tracking-tight">Lavanderia</span>
             </Link>
             {user && (
-              <nav className="ml-auto flex flex-wrap items-center gap-1 text-sm">
-                <Link href="/prenota" className={link}>
-                  Prenota
-                </Link>
-                <Link href="/mie-prenotazioni" className={link}>
-                  Le mie prenotazioni
-                </Link>
-                <Link href="/regolamento" className={link}>
-                  Regolamento
-                </Link>
-                {user.role === "ADMIN" && (
-                  <Link href="/admin" className={link}>
-                    Gestione
-                  </Link>
-                )}
-                <form action={logout}>
-                  <button className="rounded-md px-2.5 py-1.5 text-slate-500 hover:bg-slate-100">
-                    Esci ({user.firstName})
-                  </button>
-                </form>
-              </nav>
+              <>
+                <TopNav isAdmin={isAdmin} />
+                <button
+                  type="button"
+                  popoverTarget="account"
+                  className="ml-auto flex h-11 items-center gap-2.5 rounded-full border border-line bg-white px-1.5 text-sm text-ink hover:border-brand-line lg:pl-3.5"
+                >
+                  <span className="sr-only">Account di </span>
+                  <span className="max-lg:sr-only">{user.firstName}</span>
+                  <span aria-hidden className="grid size-8 place-items-center rounded-full bg-taken-strong text-xs font-bold">
+                    {initials(user)}
+                  </span>
+                </button>
+                <div
+                  id="account"
+                  popover="auto"
+                  // Tailwind's reset drops the popover's own centring; it opens under the
+                  // account button instead, at the right edge of the page's column.
+                  className="fixed inset-auto top-[4.25rem] right-4 m-0 w-64 rounded-2xl border border-line bg-white p-4 text-sm text-ink shadow-xl sm:right-[max(1.5rem,calc((100vw-80rem)/2+1.5rem))]"
+                >
+                  <p className="font-semibold">{fullName(user)}</p>
+                  <p className="truncate text-ink-2">{user.username ?? user.email}</p>
+                  <form action={logout} className="mt-3">
+                    <button className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-line font-medium hover:bg-ground">
+                      <LogoutIcon />
+                      Esci
+                    </button>
+                  </form>
+                </div>
+              </>
             )}
           </div>
         </header>
-        <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
+        <main className={`mx-auto max-w-7xl px-4 pt-6 sm:px-6 ${user ? "pb-28 md:pb-12" : "pb-12"}`}>{children}</main>
+        {user && <TabBar isAdmin={isAdmin} />}
       </body>
     </html>
   );

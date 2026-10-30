@@ -214,12 +214,12 @@ export async function updatePassword(_: FormState, formData: FormData): Promise<
   redirect("/prenota?esito=password-aggiornata");
 }
 
-// Query string that brings the user back to the same week and machine.
+// Query string that brings the user back to the same day (and its week) and machine.
 function bookingPageParams(formData: FormData) {
   const params = new URLSearchParams();
-  const week = formData.get("week");
+  const day = formData.get("day");
   const machineId = Number(formData.get("machineId"));
-  if (isValidDay(week)) params.set("settimana", week);
+  if (isValidDay(day)) params.set("giorno", day);
   if (Number.isInteger(machineId) && machineId > 0) params.set("macchina", String(machineId));
   return params;
 }
