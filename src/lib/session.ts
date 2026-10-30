@@ -36,6 +36,8 @@ export type CurrentUser = {
   room: string | null;
   role: string;
   emailVerifiedAt: Date | null;
+  /** The new address of an email change still waiting to be confirmed. */
+  emailChangeTo: string | null;
 };
 
 // Supabase says who is signed in; the resident profile and role come from our
@@ -59,11 +61,22 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
       emailVerifiedAt: true,
     },
   });
-  if (user && !user.emailVerifiedAt && data.user.email_confirmed_at) {
+  if (!user) return null;
+  if (!user.emailVerifiedAt && data.user.email_confirmed_at) {
     user.emailVerifiedAt = new Date(data.user.email_confirmed_at);
     await prisma.user.update({ where: { id: user.id }, data: { emailVerifiedAt: user.emailVerifiedAt } });
   }
-  return user;
+  // A change of address confirmed from the account page (see src/app/auth/conferma).
+  const email = data.user.email?.toLowerCase();
+  if (email && email !== user.email) {
+    try {
+      await prisma.user.update({ where: { id: user.id }, data: { email } });
+      user.email = email;
+    } catch (e) {
+      console.error("Aggiornamento email non riuscito", e);
+    }
+  }
+  return { ...user, emailChangeTo: data.user.new_email ?? null };
 });
 
 export async function requireUser() {

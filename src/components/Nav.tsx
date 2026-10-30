@@ -19,6 +19,16 @@ function useSections(isAdmin: boolean) {
   }));
 }
 
+// A link inside a popover menu: the popover belongs to the layout, which stays
+// on screen across navigations, so it has to be closed by hand.
+export function MenuLink({ href, className, children }: { href: string; className: string; children: React.ReactNode }) {
+  return (
+    <Link href={href} className={className} onClick={(e) => e.currentTarget.closest<HTMLElement>("[popover]")?.hidePopover()}>
+      {children}
+    </Link>
+  );
+}
+
 // Links in the header, from tablet width up (where the tab bar goes away).
 export function TopNav({ isAdmin }: { isAdmin: boolean }) {
   return (

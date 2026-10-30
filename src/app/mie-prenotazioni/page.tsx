@@ -13,9 +13,8 @@ export const metadata = { title: "I miei turni · Lavanderia" };
 
 const cancelClass = "h-11 rounded-xl border border-line px-3.5 text-sm font-medium hover:border-red-300 hover:text-red-700";
 
-export default async function MyBookingsPage({ searchParams }: { searchParams: Promise<{ esito?: string }> }) {
+export default async function MyBookingsPage() {
   const user = await requireVerifiedUser();
-  const { esito } = await searchParams;
   const now = new Date();
 
   const [upcoming, past, settings] = await Promise.all([
@@ -52,7 +51,7 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: P
         )}
         .
       </p>
-      <Flash code={esito} />
+      <Flash />
 
       <div className="mb-2.5 flex items-baseline justify-between gap-3">
         <h2 className="text-[17px] font-semibold">In programma</h2>

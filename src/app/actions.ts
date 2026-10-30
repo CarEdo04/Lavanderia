@@ -1,9 +1,13 @@
 "use server";
 
 import { randomBytes } from "node:crypto";
+import { Prisma } from "@prisma/client";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { canCancel, createBooking, getSettings } from "@/lib/booking";
 import { prisma } from "@/lib/db";
+import { setFlash } from "@/lib/flash";
+import { baseUsername, deletedAccount } from "@/lib/people";
 import {
   forgetPendingEmail,
   getCurrentUser,
@@ -12,7 +16,7 @@ import {
   requireUser,
   requireVerifiedUser,
 } from "@/lib/session";
-import { appUrl, supabaseServer } from "@/lib/supabase";
+import { appUrl, supabaseAdmin, supabaseServer } from "@/lib/supabase";
 import { clearFailures, clientIp, isThrottled, recordFailure } from "@/lib/throttle";
 import { isValidDay } from "@/lib/time";
 
@@ -176,12 +180,12 @@ export async function resendVerification() {
 
   const supabase = await supabaseServer();
   const { error } = await supabase.auth.resend({ type: "signup", email, options: { emailRedirectTo: confirmUrl() } });
-  if (error?.code === "over_email_send_rate_limit" || error?.status === 429) redirect("/verifica-email?esito=attendi");
-  if (error) {
+  if (error?.code === "over_email_send_rate_limit" || error?.status === 429) await setFlash("attendi");
+  else if (error) {
     console.error("Invio email di verifica non riuscito", error);
-    redirect("/verifica-email?esito=invio-fallito");
-  }
-  redirect("/verifica-email?esito=email-inviata");
+    await setFlash("invio-fallito");
+  } else await setFlash("email-inviata");
+  redirect("/verifica-email");
 }
 
 export async function logout() {
@@ -209,23 +213,163 @@ export async function requestPasswordReset(_: FormState, formData: FormData): Pr
   };
 }
 
-// Reached from the password-reset email (which signs the user in), or by a
-// signed-in user who wants to change their password.
-export async function updatePassword(_: FormState, formData: FormData): Promise<FormState> {
-  await requireUser();
+// Checks the "password" and "confirm" fields and saves the new password;
+// returns the error to show, if any.
+async function saveNewPassword(formData: FormData): Promise<string | null> {
   const password = String(formData.get("password") ?? "");
-  if (password.length < MIN_PASSWORD) return { error: `La password deve avere almeno ${MIN_PASSWORD} caratteri.` };
-  if (password !== formData.get("confirm")) return { error: "Le due password non coincidono." };
+  if (password.length < MIN_PASSWORD) return `La password deve avere almeno ${MIN_PASSWORD} caratteri.`;
+  if (password !== formData.get("confirm")) return "Le due password non coincidono.";
 
   const supabase = await supabaseServer();
   const { error } = await supabase.auth.updateUser({ password });
-  if (error?.code === "same_password") return { error: "Scegli una password diversa da quella attuale." };
-  if (error?.code === "weak_password") return { error: "Password troppo debole: scegline una più lunga o meno comune." };
+  if (error?.code === "same_password") return "Scegli una password diversa da quella attuale.";
+  if (error?.code === "weak_password") return "Password troppo debole: scegline una più lunga o meno comune.";
   if (error) {
     console.error("Cambio password non riuscito", error);
-    return { error: "Non è stato possibile cambiare la password. Riprova più tardi." };
+    return "Non è stato possibile cambiare la password. Riprova più tardi.";
   }
-  redirect("/prenota?esito=password-aggiornata");
+  return null;
+}
+
+// Reached from the password-reset email, which signs the user in.
+export async function updatePassword(_: FormState, formData: FormData): Promise<FormState> {
+  await requireUser();
+  const error = await saveNewPassword(formData);
+  if (error) return { error };
+  await setFlash("password-aggiornata");
+  redirect("/prenota");
+}
+
+// The account page asks for the current password before changing the password
+// or deleting the account. Wrong guesses count like failed logins.
+async function checkPassword(email: string, password: string): Promise<string | null> {
+  const attempt = { kind: "LOGIN" as const, ip: await clientIp(), account: email };
+  if (await isThrottled(attempt)) return "Troppi tentativi non riusciti. Riprova tra un quarto d'ora.";
+  const supabase = await supabaseServer();
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error?.code === "invalid_credentials") {
+    await recordFailure(attempt);
+    return "La password attuale non è corretta.";
+  }
+  if (error) {
+    console.error("Verifica password non riuscita", error);
+    return "Operazione non riuscita. Riprova tra qualche minuto.";
+  }
+  await clearFailures(attempt);
+  return null;
+}
+
+export async function updateProfile(_: FormState, formData: FormData): Promise<FormState> {
+  const user = await requireVerifiedUser();
+  const values = {
+    firstName: String(formData.get("firstName") ?? "").trim(),
+    lastName: String(formData.get("lastName") ?? "").trim(),
+    room: String(formData.get("room") ?? "").trim(),
+  };
+  const fail = (error: string): FormState => ({ error, values });
+  // Admins needn't live in the building: the first one is created without surname or room.
+  const optional = user.role === "ADMIN";
+  if (values.firstName.length < 1 || values.firstName.length > 40) return fail("Inserisci il tuo nome.");
+  if ((!optional && values.lastName.length < 1) || values.lastName.length > 40) return fail("Inserisci il tuo cognome.");
+  if (!(optional && !values.room) && !ROOM_RE.test(values.room)) return fail("Inserisci il numero della tua stanza.");
+
+  // The username follows the name (surname.name), picked by the same database
+  // function as at sign-up; it only changes if the name really does.
+  let username = user.username;
+  if (username && baseUsername(values) !== baseUsername(user)) {
+    const [row] = await prisma.$queryRaw<{ username: string }[]>`
+      SELECT private.available_username(${values.firstName}, ${values.lastName}) AS username`;
+    username = row.username;
+  }
+  try {
+    await prisma.user.update({ where: { id: user.id }, data: { ...values, room: values.room || null, username } });
+  } catch (e) {
+    // Someone with the same name took that username at the same moment.
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      return fail("Non è stato possibile salvare. Riprova.");
+    }
+    throw e;
+  }
+  revalidatePath("/", "layout");
+  return {
+    notice:
+      username === user.username ? "Dati salvati." : `Dati salvati. Il tuo nuovo username per accedere è ${username}.`,
+    values,
+  };
+}
+
+// Supabase sends a confirmation link to the new address (and, with "secure
+// email change", one to the old address too); the address changes once it
+// has been opened. getCurrentUser then copies it to the User row.
+export async function changeEmail(_: FormState, formData: FormData): Promise<FormState> {
+  const user = await requireVerifiedUser();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const values = { email };
+  const taken = "Esiste già un account con questa email.";
+  if (!EMAIL_RE.test(email)) return { error: "Inserisci un indirizzo email valido.", values };
+  if (email === user.email) return { error: "È già il tuo indirizzo email.", values };
+  if (await prisma.user.findUnique({ where: { email } })) return { error: taken, values };
+
+  const supabase = await supabaseServer();
+  const { error } = await supabase.auth.updateUser({ email }, { emailRedirectTo: confirmUrl("/account") });
+  if (error?.code === "email_exists" || error?.code === "user_already_exists") return { error: taken, values };
+  if (error?.code === "over_email_send_rate_limit" || error?.status === 429) return { error: TOO_MANY_EMAILS, values };
+  if (error?.code === "email_address_invalid") {
+    return { error: "Questo indirizzo email non è accettato. Usa un indirizzo reale a cui puoi ricevere posta.", values };
+  }
+  if (error?.code === "email_address_not_authorized") {
+    return { error: "Per ora non possiamo inviare email a questo indirizzo. Contatta l'amministratore.", values };
+  }
+  if (error) {
+    console.error("Cambio email non riuscito", error);
+    return { error: "Non è stato possibile cambiare l'email. Riprova più tardi.", values };
+  }
+  revalidatePath("/account");
+  return {
+    notice: `Ti abbiamo inviato un link a ${email}: aprilo per confermare il nuovo indirizzo. Se ne ricevi uno anche all'indirizzo attuale, apri anche quello.`,
+  };
+}
+
+export async function changePassword(_: FormState, formData: FormData): Promise<FormState> {
+  const user = await requireVerifiedUser();
+  const wrong = await checkPassword(user.email, String(formData.get("current") ?? ""));
+  if (wrong) return { error: wrong };
+  const error = await saveNewPassword(formData);
+  return error ? { error } : { notice: "Password aggiornata." };
+}
+
+// Future bookings are cancelled. An account with past bookings keeps its row
+// for the laundry's history, without the personal details; one without any
+// is deleted outright.
+export async function deleteAccount(_: FormState, formData: FormData): Promise<FormState> {
+  const user = await requireUser();
+  const wrong = await checkPassword(user.email, String(formData.get("password") ?? ""));
+  if (wrong) return { error: wrong };
+  if (user.role === "ADMIN" && (await prisma.user.count({ where: { role: "ADMIN" } })) <= 1) {
+    return {
+      error: "Sei l'unico amministratore: nomina un altro admin dalla pagina Gestione prima di eliminare il tuo account.",
+    };
+  }
+
+  const { error } = await supabaseAdmin().auth.admin.deleteUser(user.authId);
+  if (error) {
+    console.error("Eliminazione account non riuscita", error);
+    return { error: "Non è stato possibile eliminare l'account. Riprova più tardi." };
+  }
+  await prisma.$transaction(async (tx) => {
+    await tx.booking.deleteMany({ where: { userId: user.id, start: { gt: new Date() } } });
+    if (await tx.booking.count({ where: { userId: user.id } })) {
+      await tx.user.update({ where: { id: user.id }, data: deletedAccount(user.id) });
+    } else {
+      await tx.user.delete({ where: { id: user.id } });
+    }
+  });
+
+  // The Auth account is gone; this just clears the session cookies.
+  await (await supabaseServer()).auth.signOut({ scope: "local" });
+  await forgetPendingEmail();
+  await setFlash("account-eliminato");
+  redirect("/login");
 }
 
 // Query string that brings the user back to the same day (and its week) and machine.
@@ -245,9 +389,9 @@ export async function book(formData: FormData) {
   const machineId = Number(formData.get("machineId"));
   const start = new Date(String(formData.get("start")));
   const params = bookingPageParams(formData);
-  const go = (esito: string) => {
-    params.set("esito", esito);
-    redirect(`/prenota?${params}`);
+  const go = async (esito: string) => {
+    await setFlash(esito);
+    redirect(params.size ? `/prenota?${params}` : "/prenota");
   };
 
   let userId = user.id;
@@ -259,7 +403,7 @@ export async function book(formData: FormData) {
   }
 
   const result = await createBooking(userId, machineId, start, { byAdmin: isAdmin });
-  go(result === "limite" && userId !== user.id ? "limite-utente" : result);
+  await go(result === "limite" && userId !== user.id ? "limite-utente" : result);
 }
 
 // Owners can cancel their own bookings until the notice window starts; admins
@@ -272,9 +416,9 @@ export async function cancel(formData: FormData) {
   const target =
     back === "admin" && user.role === "ADMIN" ? "/admin" : back === "mie" ? "/mie-prenotazioni" : "/prenota";
   const params = target === "/prenota" ? bookingPageParams(formData) : new URLSearchParams();
-  const go = (esito: string) => {
-    params.set("esito", esito);
-    redirect(`${target}?${params}`);
+  const go = async (esito: string) => {
+    await setFlash(esito);
+    redirect(params.size ? `${target}?${params}` : target);
   };
 
   const booking = Number.isInteger(id) ? await prisma.booking.findUnique({ where: { id } }) : null;
@@ -284,5 +428,5 @@ export async function cancel(formData: FormData) {
   if (!canCancel(booking, user, await getSettings())) return go("contatta-admin");
 
   await prisma.booking.delete({ where: { id } });
-  go("annullata");
+  await go("annullata");
 }

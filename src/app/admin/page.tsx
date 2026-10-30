@@ -19,7 +19,7 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { getSettings } from "@/lib/booking";
 import { prisma } from "@/lib/db";
 import { MACHINE_TYPES, NOTICE_LEVELS } from "@/lib/messages";
-import { fullName } from "@/lib/people";
+import { fullName, notDeleted } from "@/lib/people";
 import { rulesText } from "@/lib/rules";
 import { requireAdmin } from "@/lib/session";
 import { WEEKDAYS, addDays, dayOf, formatDate, formatDay, formatDuration, formatTime, today } from "@/lib/time";
@@ -45,9 +45,8 @@ function TypeSelect({ value }: { value?: string }) {
   );
 }
 
-export default async function AdminPage({ searchParams }: { searchParams: Promise<{ esito?: string }> }) {
+export default async function AdminPage() {
   const admin = await requireAdmin();
-  const { esito } = await searchParams;
   const now = new Date();
   const first = today();
 
@@ -63,7 +62,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       orderBy: { start: "asc" },
       take: 100,
     }),
-    prisma.user.findMany({ orderBy: [{ lastName: "asc" }, { firstName: "asc" }] }),
+    // Deleted accounts only stay for the booking history.
+    prisma.user.findMany({ where: notDeleted, orderBy: [{ lastName: "asc" }, { firstName: "asc" }] }),
     // Expired notices drop off the list but stay in the database.
     prisma.notice.findMany({ where: { endDay: { gte: first } }, orderBy: [{ startDay: "asc" }, { id: "asc" }] }),
   ]);
@@ -71,7 +71,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold tracking-tight">Gestione</h1>
-      <Flash code={esito} />
+      <Flash />
 
       <section className={card}>
         <h2 className={h2}>Avvisi</h2>

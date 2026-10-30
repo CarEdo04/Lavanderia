@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { fullName } from "@/lib/people";
+import { fullName, isDeleted } from "@/lib/people";
 import { requireAdmin } from "@/lib/session";
 import { dayOf, formatDay, formatTime, localToUtc, today } from "@/lib/time";
 
@@ -107,7 +107,7 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
                     <td className="py-2 pr-3">{b.machine.name}</td>
                     <td className="py-2 pr-3">{fullName(b.user)}</td>
                     <td className="py-2 pr-3">{b.user.username ?? "—"}</td>
-                    <td className="py-2 pr-3">{b.user.email}</td>
+                    <td className="py-2 pr-3">{isDeleted(b.user) ? "—" : b.user.email}</td>
                     <td className="py-2 pr-3">{b.user.room ?? "—"}</td>
                   </tr>
                 ))}

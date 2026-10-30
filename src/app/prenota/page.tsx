@@ -22,6 +22,7 @@ import {
   mondayOf,
   slotsForDay,
   today,
+  WEEKDAYS,
   type Slot,
 } from "@/lib/time";
 
@@ -43,7 +44,15 @@ function weekLabel(monday: string) {
   return `${from} – ${shortDate(sunday)}`;
 }
 
-type Kind = "free" | "mine" | "taken" | "closed" | "past" | "later";
+// The weekdays the laundry is closed, Monday first: "la domenica", "il sabato e la domenica".
+function closedDaysText(closedWeekdays: string) {
+  const days = [1, 2, 3, 4, 5, 6, 0]
+    .filter((d) => closedWeekdays.includes(String(d)))
+    .map((d) => `${d === 0 ? "la" : "il"} ${WEEKDAYS[d].toLowerCase()}`);
+  return days.length > 1 ? `${days.slice(0, -1).join(", ")} e ${days.at(-1)}` : days[0];
+}
+
+type Kind ="free" | "mine" | "taken" | "closed" | "past" | "later";
 
 const STATUS: Record<Kind, string> = {
   free: "Libero",
@@ -57,10 +66,10 @@ const STATUS: Record<Kind, string> = {
 export default async function BookPage({
   searchParams,
 }: {
-  searchParams: Promise<{ giorno?: string; settimana?: string; macchina?: string; esito?: string }>;
+  searchParams: Promise<{ giorno?: string; settimana?: string; macchina?: string }>;
 }) {
   const user = await requireVerifiedUser();
-  const { giorno, settimana, macchina, esito } = await searchParams;
+  const { giorno, settimana, macchina } = await searchParams;
   const settings = await getSettings();
   const isAdmin = user.role === "ADMIN";
   const now = new Date();
@@ -457,13 +466,18 @@ export default async function BookPage({
         );
       case "taken":
         return booker(b!, day, slot, "grid", `${box} bg-taken px-2.5 text-left text-[13px] text-ink`);
+      // Not "Chiuso", which would read as the laundry room being closed.
       case "closed":
         return (
           <div
-            className={`${box} hatch justify-center font-medium text-muted`}
-            title={`Le prenotazioni chiudono ${settings.minHoursBefore} ore prima del turno`}
+            className={`${box} hatch flex-col justify-center text-xs leading-tight font-medium text-muted`}
+            title={`Le prenotazioni chiudono ${hours} ore prima del turno`}
           >
-            Chiuso
+            <span>Prenotazioni</span>
+            <span className="flex items-center gap-1">
+              <LockIcon className="size-3" />
+              chiuse
+            </span>
           </div>
         );
       default:
@@ -478,6 +492,7 @@ export default async function BookPage({
 
   const nextDay = next && dayOf(next.start);
   const max = settings.maxActiveBookings;
+  const closedDays = closedDaysText(settings.closedWeekdays);
 
   return (
     <div>
@@ -489,9 +504,10 @@ export default async function BookPage({
       <p className="mt-1 mb-5 text-sm text-ink-2">
         Turni da {formatDuration(settings.slotMinutes)}. Si prenota e si annulla almeno {hours} ore prima del turno, e si
         prenota fino a {formatWindow(settings.maxDaysAhead)} in anticipo.
+        {closedDays && ` La lavanderia è chiusa ${closedDays}.`}
       </p>
 
-      <Flash code={esito} />
+      <Flash />
 
       {isAdmin && (
         <datalist id="residenti">
@@ -585,9 +601,17 @@ export default async function BookPage({
                   Dentro il preavviso: prenotabile solo dagli admin
                 </li>
               )}
+              {!isAdmin && (
+                <li className="flex items-center gap-2.5">
+                  <span aria-hidden className="hatch grid h-[18px] w-7 place-items-center rounded-md border border-line">
+                    <LockIcon className="size-3 text-muted" />
+                  </span>
+                  Prenotazioni chiuse: mancano meno di {hours} ore
+                </li>
+              )}
               <li className="flex items-center gap-2.5">
                 <span aria-hidden className="hatch h-[18px] w-7 rounded-md border border-line" />
-                Chiuso o concluso
+                Concluso o non ancora prenotabile
               </li>
             </ul>
           </section>
@@ -631,7 +655,8 @@ export default async function BookPage({
                     {days.map((d) => {
                       const free = freeCount(d);
                       const open = d.slots.some((s) => !isTooLate(s, settings, now));
-                      const meta = free > 0 ? (free === 1 ? "1 libero" : `${free} liberi`) : open ? "pieno" : "chiuso";
+                      const meta =
+                        free > 0 ? (free === 1 ? "1 libero" : `${free} liberi`) : open ? "pieno" : "prenotazioni chiuse";
                       const current = d.day === selected.day;
                       return (
                         <Link
@@ -652,9 +677,10 @@ export default async function BookPage({
                           <span className="eyebrow text-[11px]">{d.day === first ? "oggi" : formatDay(d.day, { weekday: "short" })}</span>
                           <span className="text-[22px] leading-tight font-bold">{formatDay(d.day, { day: "numeric" })}</span>
                           <span
-                            className={`text-[11px] font-semibold ${current ? "text-white" : free > 0 ? "text-brand" : "text-ink-2"}`}
+                            className={`flex h-4 items-center text-[11px] font-semibold ${current ? "text-white" : free > 0 ? "text-brand" : "text-ink-2"}`}
                           >
-                            {meta}
+                            {/* Too long for the chip: the lock stands for it, as in the grid. */}
+                            {free === 0 && !open ? <LockIcon className="size-3.5" /> : meta}
                           </span>
                         </Link>
                       );

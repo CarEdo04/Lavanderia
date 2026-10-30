@@ -1,16 +1,11 @@
+import { FlashMessage } from "./FlashMessage";
+import { readFlash } from "@/lib/flash";
 import { ESITI } from "@/lib/messages";
 
-export function Flash({ code }: { code?: string }) {
-  const msg = code ? ESITI[code] : undefined;
+// The outcome of the last action, if it hasn't been shown yet (see src/lib/flash.ts).
+export async function Flash() {
+  const flash = await readFlash();
+  const msg = flash && ESITI[flash.code];
   if (!msg) return null;
-  return (
-    <div
-      role="status"
-      className={`mb-4 rounded-2xl border px-4 py-3 text-sm font-medium ${
-        msg.ok ? "border-brand-line bg-brand-soft text-brand-ink" : "border-red-200 bg-red-50 text-red-800"
-      }`}
-    >
-      {msg.text}
-    </div>
-  );
+  return <FlashMessage key={flash.id} id={flash.id} ok={msg.ok} text={msg.text} />;
 }

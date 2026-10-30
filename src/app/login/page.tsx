@@ -6,12 +6,11 @@ import { getCurrentUser } from "@/lib/session";
 
 export const metadata = { title: "Accedi · Lavanderia" };
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ esito?: string }> }) {
+export default async function LoginPage() {
   if (await getCurrentUser()) redirect("/prenota");
-  const { esito } = await searchParams;
   return (
     <AuthCard title="Accedi" intro="Prenota la lavanderia del tuo condominio.">
-      <Flash code={esito} />
+      <Flash />
       <LoginForm />
     </AuthCard>
   );

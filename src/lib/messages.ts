@@ -1,4 +1,4 @@
-// Outcome codes passed in the `esito` query parameter after an action.
+// Outcomes of actions, shown once on the next page (see src/lib/flash.ts).
 export const ESITI: Record<string, { ok: boolean; text: string }> = {
   prenotata: { ok: true, text: "Prenotazione confermata." },
   annullata: { ok: true, text: "Prenotazione annullata." },
@@ -36,6 +36,12 @@ export const ESITI: Record<string, { ok: boolean; text: string }> = {
   "invio-fallito": { ok: false, text: "Non è stato possibile inviare l'email. Riprova più tardi o contatta l'amministratore." },
   "link-non-valido": { ok: false, text: "Il link non è valido, è scaduto o è già stato usato. Accedi, oppure chiedine uno nuovo." },
   "password-aggiornata": { ok: true, text: "Password aggiornata." },
+  "email-aggiornata": { ok: true, text: "Email aggiornata: da ora accedi con il nuovo indirizzo." },
+  "email-altro-link": {
+    ok: true,
+    text: "Link confermato. Per completare il cambio apri anche il link che abbiamo inviato all'altro indirizzo.",
+  },
+  "account-eliminato": { ok: true, text: "Il tuo account è stato eliminato." },
   "operazione-fallita": { ok: false, text: "Operazione non riuscita. Riprova più tardi." },
 };
 

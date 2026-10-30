@@ -88,7 +88,14 @@ export const UndoIcon = ({ className = "size-[18px]" }: Props) => (
   </svg>
 );
 
-export const LogoutIcon = ({ className = "size-[18px]" }: Props) => (
+export const UserIcon = ({ className = "size-[18px]" }: Props) => (
+  <svg {...svg} className={className}>
+    <circle cx="12" cy="8" r="4" />
+    <path d="M4.5 20.5a7.5 7.5 0 0 1 15 0" />
+  </svg>
+);
+
+export const LogoutIcon =({ className = "size-[18px]" }: Props) => (
   <svg {...svg} className={className}>
     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
     <path d="m16 17 5-5-5-5M21 12H9" />

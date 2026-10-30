@@ -3,13 +3,17 @@
 import { randomInt } from "node:crypto";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { setFlash } from "@/lib/flash";
 import { MACHINE_TYPES, NOTICE_LEVELS } from "@/lib/messages";
 import { DEFAULT_RULES } from "@/lib/rules";
 import { requireAdmin } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabase";
 import { addDays, isValidDay } from "@/lib/time";
 
-const done = (esito = "salvato"): never => redirect(`/admin?esito=${esito}`);
+async function done(esito = "salvato"): Promise<never> {
+  await setFlash(esito);
+  redirect("/admin");
+}
 
 function int(formData: FormData, key: string, min: number, max: number): number | null {
   const n = Number(formData.get(key));
@@ -53,7 +57,7 @@ export async function saveSettings(formData: FormData) {
     registrationCode: registrationCode || null,
   };
   await prisma.settings.upsert({ where: { id: 1 }, update: data, create: { id: 1, ...data } });
-  done();
+  return done();
 }
 
 // 8 random characters without look-alikes (0/O, 1/I/L), e.g. "K7QM-3XPA":
@@ -65,7 +69,7 @@ export async function generateRegistrationCode() {
   const chars = Array.from({ length: 8 }, () => CODE_ALPHABET[randomInt(CODE_ALPHABET.length)]);
   const registrationCode = `${chars.slice(0, 4).join("")}-${chars.slice(4).join("")}`;
   await prisma.settings.upsert({ where: { id: 1 }, update: { registrationCode }, create: { id: 1, registrationCode } });
-  done("codice-generato");
+  return done("codice-generato");
 }
 
 function machineFields(formData: FormData) {
@@ -81,7 +85,7 @@ export async function addMachine(formData: FormData) {
   const data = machineFields(formData);
   if (!data) return done("dati-non-validi");
   await prisma.machine.create({ data });
-  done();
+  return done();
 }
 
 export async function updateMachine(formData: FormData) {
@@ -90,7 +94,7 @@ export async function updateMachine(formData: FormData) {
   const data = machineFields(formData);
   if (id === null || !data) return done("dati-non-validi");
   await prisma.machine.update({ where: { id }, data });
-  done();
+  return done();
 }
 
 export async function toggleMachine(formData: FormData) {
@@ -99,7 +103,7 @@ export async function toggleMachine(formData: FormData) {
   const machine = id === null ? null : await prisma.machine.findUnique({ where: { id } });
   if (!machine) return done("dati-non-validi");
   await prisma.machine.update({ where: { id: machine.id }, data: { active: !machine.active } });
-  done();
+  return done();
 }
 
 export async function deleteMachine(formData: FormData) {
@@ -110,7 +114,7 @@ export async function deleteMachine(formData: FormData) {
   // it can only be disabled. The database enforces this too.
   if (await prisma.booking.count({ where: { machineId: id } })) return done("macchina-con-storico");
   await prisma.machine.deleteMany({ where: { id } });
-  done();
+  return done();
 }
 
 export async function saveRules(formData: FormData) {
@@ -120,7 +124,7 @@ export async function saveRules(formData: FormData) {
   // Store null while the text matches the default, so it follows future updates.
   const rulesText = text && text !== DEFAULT_RULES ? text : null;
   await prisma.settings.upsert({ where: { id: 1 }, update: { rulesText }, create: { id: 1, rulesText } });
-  done();
+  return done();
 }
 
 // Rejects well-formed but impossible dates such as 2026-02-31.
@@ -143,7 +147,7 @@ export async function addNotice(formData: FormData) {
     return done("dati-non-validi");
   }
   await prisma.notice.create({ data: { message, level, startDay, endDay } });
-  done("avviso-pubblicato");
+  return done("avviso-pubblicato");
 }
 
 export async function deleteNotice(formData: FormData) {
@@ -151,7 +155,7 @@ export async function deleteNotice(formData: FormData) {
   const id = int(formData, "id", 1, Number.MAX_SAFE_INTEGER);
   if (id === null) return done("dati-non-validi");
   await prisma.notice.deleteMany({ where: { id } });
-  done("avviso-rimosso");
+  return done("avviso-rimosso");
 }
 
 // For residents who cannot receive the verification email.
@@ -167,7 +171,7 @@ export async function markVerified(formData: FormData) {
     return done("operazione-fallita");
   }
   await prisma.user.updateMany({ where: { id: user.id, emailVerifiedAt: null }, data: { emailVerifiedAt: new Date() } });
-  done();
+  return done();
 }
 
 export async function setRole(formData: FormData) {
@@ -177,5 +181,5 @@ export async function setRole(formData: FormData) {
   if (id === null || (role !== "USER" && role !== "ADMIN")) return done("dati-non-validi");
   if (id === admin.id) return done("se-stesso");
   await prisma.user.update({ where: { id }, data: { role } });
-  done();
+  return done();
 }

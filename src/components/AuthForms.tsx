@@ -6,13 +6,13 @@ import { login, register, requestPasswordReset, updatePassword, type FormState }
 import { baseUsername } from "@/lib/people";
 import { SubmitButton } from "./SubmitButton";
 
-const input =
+export const input =
   "mt-1.5 block h-12 w-full rounded-xl border-[1.5px] border-line bg-white px-3.5 text-base font-normal text-ink focus:border-brand focus:ring-3 focus:ring-brand/20 focus:outline-none";
-const label = "block text-sm font-semibold text-ink";
-const hint = "font-normal text-ink-2";
-const button = "h-[52px] w-full rounded-2xl bg-brand px-4 font-semibold text-white hover:bg-brand-strong";
+export const label = "block text-sm font-semibold text-ink";
+export const hint = "font-normal text-ink-2";
+export const button = "h-[52px] w-full rounded-2xl bg-brand px-4 font-semibold text-white hover:bg-brand-strong";
 
-function FormError({ state }: { state: FormState }) {
+export function FormError({ state }: { state: FormState }) {
   if (!state?.error) return null;
   return (
     <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
@@ -21,7 +21,7 @@ function FormError({ state }: { state: FormState }) {
   );
 }
 
-function FormNotice({ state }: { state: FormState }) {
+export function FormNotice({ state }: { state: FormState }) {
   if (!state?.notice) return null;
   return (
     <p role="status" className="rounded-xl border border-brand-line bg-brand-soft px-3 py-2 text-sm text-brand-ink">

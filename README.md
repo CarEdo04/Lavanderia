@@ -8,10 +8,14 @@ A booking app for a shared laundry room in an apartment building or dorm. It wor
 - **Accounts live in Supabase Auth**, which stores the passwords and sends the emails:
   - after signing up, residents get a confirmation link and can only book once they've opened it; they can ask for a new one from the "check your email" page
   - *Password dimenticata?* on the login page sends a link to choose a new password
+  - *Il tuo account* (in the account menu) lets residents change their name, room, email and password, or delete their account. Changing the name changes the username too. A new email address takes effect once the link Supabase sends to it has been opened (with Supabase's *Secure email change* on, the link sent to the old address too); the app then copies it to the profile. Changing the password or deleting the account asks for the current password, and wrong guesses count like failed logins. Deleting cancels the resident's future bookings; if they have past ones, the profile row stays for the history with the name, email, username and room removed (it shows as "Account eliminato"), otherwise it's deleted. The last admin can't delete their account.
   - login works with either the email address or the username, which is always `surname.name` (lowercase, without accents, spaces or apostrophes; homonyms get a number, e.g. `rossi.mario2`)
   - the resident profile (name, room, role, rules acceptance) is stored in the app's own `User` table, linked by `authId`. A database trigger on `auth.users` creates it in the same transaction as the Supabase account, so there's never an account without a profile or the other way round. The app first validates the form (including the registration code) and saves it as a `PendingSignup` row, then passes that row's one-time token in the sign-up metadata; the trigger builds the profile from the row and refuses any sign-up without a valid token. So accounts can only be created through the app's form (or `npm run setup` for the first admin): **Add user** in the Supabase dashboard fails on purpose.
 - **Brute-force protection**: failed logins are limited per IP address (20 in 15 minutes) and per account (10 in 15 minutes), and wrong registration codes per IP address (10 per hour). The failures are counted in the database (`src/lib/throttle.ts`), because Supabase sees every request coming from the server's address and can't tell residents apart.
 - **Residents** book a free shift from a week grid (days × shifts, like a paper booking sheet). On phones the week shows as one card per day. By default there are four 4-hour shifts, Monday to Saturday. They can cancel their own bookings from the grid or from *Le mie prenotazioni* until the notice window starts (see below); after that the *Annulla* button explains that only an admin can cancel the shift.
+- **Shifts inside the notice window** show a lock and *Prenotazioni chiuse* to residents. The word *chiusa* is kept for the days the laundry room itself is closed, which the booking page lists.
+- **Action results** (e.g. *Prenotazione confermata*) travel in a cookie that lives a minute, not in the URL, so they show once: not again on reload, on Back, or in a shared link (`src/lib/flash.ts`).
+- **Error, loading and "page not found" screens** are in Italian, and keep the header and tab bar when only the page failed.
 - **Booked shifts show only the booker's first name and surname** to residents. Username, email and room are visible to admins only (and are not even loaded for residents).
 - **Booking rules** are enforced on the server:
   - no double bookings (an overlap check, backed by a unique index)
@@ -48,6 +52,7 @@ Next.js 15 (App Router, server actions) · TypeScript · Tailwind CSS 4 · Prism
 5. **Authentication → Emails → Templates** (recommended): so the links work even when opened on another device, change the link in two templates:
    - *Confirm signup*: `{{ .SiteURL }}/auth/conferma?token_hash={{ .TokenHash }}&type=email`
    - *Reset password*: `{{ .SiteURL }}/auth/conferma?token_hash={{ .TokenHash }}&type=recovery`
+   - *Change email address*: `{{ .SiteURL }}/auth/conferma?token_hash={{ .TokenHash }}&type=email_change`
 
    You can also translate the email texts into Italian there.
 

@@ -1,23 +1,12 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, Schibsted_Grotesk } from "next/font/google";
 import Link from "next/link";
 import { logout } from "./actions";
-import { LogoutIcon, WasherIcon } from "@/components/Icons";
-import { TabBar, TopNav } from "@/components/Nav";
+import { fontVariables } from "./fonts";
+import { LogoutIcon, UserIcon, WasherIcon } from "@/components/Icons";
+import { MenuLink, TabBar, TopNav } from "@/components/Nav";
 import { fullName, initials } from "@/lib/people";
 import { getCurrentUser } from "@/lib/session";
 import "./globals.css";
-
-const sans = Schibsted_Grotesk({
-  variable: "--font-schibsted",
-  subsets: ["latin"],
-});
-
-const mono = IBM_Plex_Mono({
-  variable: "--font-plex-mono",
-  subsets: ["latin"],
-  weight: ["400", "500"],
-});
 
 export const metadata: Metadata = {
   title: "Lavanderia",
@@ -34,7 +23,7 @@ export default async function RootLayout({
 
   return (
     <html lang="it">
-      <body className={`${sans.variable} ${mono.variable} antialiased`}>
+      <body className={`${fontVariables} antialiased`}>
         <header className="border-b border-line bg-white">
           <div className="mx-auto flex max-w-7xl items-center gap-x-6 px-4 py-2.5 sm:px-6">
             <Link href="/" className="flex min-h-11 items-center gap-2.5 text-ink">
@@ -66,7 +55,14 @@ export default async function RootLayout({
                 >
                   <p className="font-semibold">{fullName(user)}</p>
                   <p className="truncate text-ink-2">{user.username ?? user.email}</p>
-                  <form action={logout} className="mt-3">
+                  <MenuLink
+                    href="/account"
+                    className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-line font-medium hover:bg-ground"
+                  >
+                    <UserIcon />
+                    Il tuo account
+                  </MenuLink>
+                  <form action={logout} className="mt-2">
                     <button className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-line font-medium hover:bg-ground">
                       <LogoutIcon />
                       Esci
