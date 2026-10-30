@@ -575,46 +575,6 @@ export default async function BookPage({
               </span>
             </span>
           </div>
-
-          <section aria-labelledby="legenda" className="hidden rounded-2xl border border-line bg-white p-4 xl:block">
-            <h2 id="legenda" className="mb-3 text-[15px] font-semibold">
-              Legenda
-            </h2>
-            <ul className="space-y-2.5 text-sm text-ink-2">
-              <li className="flex items-center gap-2.5">
-                <span aria-hidden className="h-[18px] w-7 rounded-md border-[1.5px] border-brand-line" />
-                Libero: clicca per prenotare
-              </li>
-              <li className="flex items-center gap-2.5">
-                <span aria-hidden className="h-[18px] w-7 rounded-md bg-brand" />
-                Il tuo turno
-              </li>
-              <li className="flex items-center gap-2.5">
-                <span aria-hidden className="h-[18px] w-7 rounded-md bg-taken-strong" />
-                {isAdmin ? "Occupato: clicca per i dettagli" : "Occupato, con il nome di chi ha prenotato"}
-              </li>
-              {isAdmin && (
-                <li className="flex items-center gap-2.5">
-                  <span aria-hidden className="grid h-[18px] w-7 place-items-center rounded-md border-[1.5px] border-brand-line">
-                    <LockIcon className="size-3 text-brand" />
-                  </span>
-                  Dentro il preavviso: prenotabile solo dagli admin
-                </li>
-              )}
-              {!isAdmin && (
-                <li className="flex items-center gap-2.5">
-                  <span aria-hidden className="hatch grid h-[18px] w-7 place-items-center rounded-md border border-line">
-                    <LockIcon className="size-3 text-muted" />
-                  </span>
-                  Prenotazioni chiuse: mancano meno di {hours} ore
-                </li>
-              )}
-              <li className="flex items-center gap-2.5">
-                <span aria-hidden className="hatch h-[18px] w-7 rounded-md border border-line" />
-                Concluso o non ancora prenotabile
-              </li>
-            </ul>
-          </section>
         </aside>
 
         <div className="min-w-0 flex-1">
